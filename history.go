@@ -113,3 +113,117 @@ func enrollHistory(ctx context.Context, client *messagix.Client, wa *store.Devic
 		return map[string]any{"type": "history", "state": "enrolled"}
 	}
 	h := client.GetSecureHistoryClient()
+	backup, err := h.GetBackup(ctx)
+	if err != nil {
+		return fail(err)
+	}
+	recovery, err := h.RecoverPIN(ctx, backup, []byte(pin))
+	if err != nil {
+		return fail(err)
+	}
+	virtual, err := h.GetVirtualDevice(ctx, backup, selfID, recovery.Code)
+	if err != nil {
+		return fail(err)
+	}
+	epochs, err := virtual.DeriveEpochs()
+	if err != nil {
+		return fail(err)
+	}
+	enrollment, err := virtual.PrepareDevice(backup.ID, h.RegistrationID, wa.IdentityKey, epochs)
+	if err != nil {
+		return fail(err)
+	}
+	if err = hist.save(enrollment.Device); err != nil { // d'abord sauvegarder (inscription non confirmée), comme le connecteur officiel
+		return fail(err)
+	}
+	device, err := h.AddDevice(ctx, enrollment)
+	if err != nil {
+		var rejected *securehistory.EnrollmentError
+		if errors.As(err, &rejected) {
+			hist.clear()
+		}
+		return fail(err)
+	}
+	if err = hist.save(device); err != nil {
+		return fail(err)
+	}
+	return map[string]any{"type": "history", "state": "enrolled"}
+}
+
+// fetchHistoryPage lit une page de messages chiffrés plus anciens que beforeMs et les émet.
+func fetchHistoryPage(ctx context.Context, client *messagix.Client, chatUser string, beforeMs int64, count int,
+	selfID int64, emit func(any)) map[string]any {
+	dev := hist.device()
+	out := map[string]any{"type": "history_fetched", "chat": chatUser}
+	if dev == nil || dev.ID == "" {
+		out["error"] = "appareil d'historique non inscrit"
+		return out
+	}
+	if beforeMs <= 0 {
+		beforeMs = time.Now().UnixMilli() + 60_000
+	}
+	page, err := client.GetSecureHistoryClient().FetchMessages(ctx, dev, chatUser, true, beforeMs, count)
+	if err != nil {
+		out["error"] = err.Error()
+		return out
+	}
+	if page.Epochs != nil && len(page.Epochs.Edges) > 0 { // les clés d'époque évoluent : on les garde à jour
+		if d2, e2 := dev.WithEpochs(page.Epochs); e2 == nil {
+			_ = hist.save(d2)
+			dev = d2
+		}
+	}
+	n := 0
+	for _, m := range page.Decrypt(ctx, dev, chatUser, selfID, false) {
+		id, sender, text, ts, app, arm, ok := decodeArchive(m)
+		if !ok {
+			continue
+		}
+		thread, _ := strconv.ParseInt(chatUser, 10, 64)
+		atts := e2eeAttachments(app, thread, chatUser+"@msgr", id)
+		if arm != nil {
+			if text == "" {
+				text = armadilloText(arm)
+			}
+			atts = append(atts, armadilloAttachments(arm, thread, chatUser+"@msgr", id)...)
+		}
+		for _, a := range atts {
+			a["ts"], a["history"] = ts, true
+			emit(a)
+		}
+		emit(inMessage{Type: "message", ThreadID: thread, Chat: chatUser + "@msgr", MessageID: id, SenderID: sender,
+			Text: text, TimeMs: ts, FromMe: sender == selfID, History: true, E2EE: true})
+		n++
+	}
+	out["count"] = n
+	if page.Range != nil {
+		out["next"] = page.Range.Before
+		out["has_more"] = page.Range.HasMoreBefore != nil && *page.Range.HasMoreBefore
+	}
+	return out
+}
+
+func decodeArchive(m *securehistory.DecryptedMessage) (id string, sender int64, text string, ts int64, capp *waConsumerApplication.ConsumerApplication, arm *waArmadilloApplication.Armadillo, ok bool) {
+	if m == nil || m.Message == nil || m.Message.Message == nil {
+		return
+	}
+	bm := m.Message.Message
+	payload, isMsg := bm.GetPayload().(*waArmadilloBackupMessage.BackupMessage_EncryptedTransportMessage)
+	if !isMsg {
+		return
+	}
+	var app waMsgApplication.MessageApplication
+	if proto.Unmarshal(payload.EncryptedTransportMessage, &app) != nil {
+		return
+	}
+	decoded, err := whatsmeow.DecodeFBApplication(&app)
+	if err != nil {
+		return
+	}
+	meta := bm.GetMetadata()
+	sender, _ = strconv.ParseInt(meta.GetSenderID(), 10, 64)
+	capp = decoded.GetConsumerApplication()
+	arm = decoded.GetArmadillo()
+	text = e2eeText(capp)
+	return meta.GetMessageID(), sender, text, m.Message.TimestampMS, capp, arm, meta.GetMessageID() != ""
+}
