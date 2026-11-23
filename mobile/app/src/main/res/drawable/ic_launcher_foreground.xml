@@ -3,3 +3,7 @@
     <group android:scaleX="0.62" android:scaleY="0.62" android:pivotX="54" android:pivotY="54">
         <path android:strokeColor="#D0460B" android:strokeWidth="9" android:fillColor="#00000000"
             android:pathData="M30,28 h26 a10,10 0 0 1 10,10 v16 a10,10 0 0 1 -10,10 h-26 a10,10 0 0 1 -10,-10 v-16 a10,10 0 0 1 10,-10 z" />
+        <path android:strokeColor="#F6893A" android:strokeWidth="9" android:fillColor="#00000000"
+            android:pathData="M52,50 h26 a10,10 0 0 1 10,10 v16 a10,10 0 0 1 -10,10 h-26 a10,10 0 0 1 -10,-10 v-16 a10,10 0 0 1 10,-10 z" />
+    </group>
+</vector>
