@@ -293,3 +293,151 @@ func previewRef(sp *waCommon.SubProtocol) *mediaRef {
 	var wt waMediaTransport.WAMediaTransport
 	if proto.Unmarshal(sp.GetPayload(), &wt) == nil {
 		return refFrom(&wt, 0, 0, 0)
+	}
+	return nil
+}
+
+func httpURL(s string) string {
+	if strings.HasPrefix(strings.ToLower(s), "http://") || strings.HasPrefix(strings.ToLower(s), "https://") {
+		return s
+	}
+	return ""
+}
+
+// armadilloText : texte qui accompagne un message enrichi (post partagé, reel…).
+func armadilloText(a *waArmadilloApplication.Armadillo) string {
+	return a.GetPayload().GetContent().GetExtendedContentMessage().GetMessageText()
+}
+
+// armadilloAttachments décrit les messages « enrichis » du canal chiffré : posts, reels, histoires et liens partagés, galeries, éphémères.
+func armadilloAttachments(a *waArmadilloApplication.Armadillo, thread int64, chat, msgID string) []attachment {
+	c := a.GetPayload().GetContent()
+	base := func(kind string) attachment {
+		return attachment{"type": "attachment", "source": "e2ee", "thread": thread, "chat": chat, "id": msgID, "idx": int64(0), "kind": kind}
+	}
+	var out []attachment
+	if x := c.GetExtendedContentMessage(); x != nil {
+		at := base("link")
+		nz(at, "title", firstNonEmpty(x.GetTitleText(), x.GetHeaderTitle()))
+		nz(at, "subtitle", firstNonEmpty(x.GetSubtitleText(), x.GetHeaderSubtitle()))
+		nz(at, "descr", x.GetOverlayDescription())
+		nz(at, "site", x.GetOverlayTitle())
+		for _, cta := range x.GetCtas() {
+			if u := firstNonEmpty(httpURL(cta.GetActionURL()), httpURL(cta.GetNativeURL())); u != "" {
+				at["action"] = u
+				break
+			}
+		}
+		prev := previewRef(x.GetHeaderImage())
+		if prev == nil && len(x.GetPreviews()) > 0 {
+			prev = previewRef(x.GetPreviews()[0])
+		}
+		if prev != nil {
+			at["blob"] = prev.blob()
+			at["mtype"] = "xmapreview"
+			nz(at, "w", prev.w)
+			nz(at, "h", prev.h)
+		}
+		out = append(out, at)
+	}
+	if g := c.GetImageGalleryMessage(); g != nil {
+		for i, sp := range g.GetImages() {
+			var t waMediaTransport.ImageTransport
+			if sp != nil && proto.Unmarshal(sp.GetPayload(), &t) == nil {
+				if r := refFrom(t.GetIntegral().GetTransport(), t.GetAncillary().GetWidth(), t.GetAncillary().GetHeight(), 0); r != nil {
+					at := base("image")
+					at["idx"] = int64(i)
+					at["blob"], at["mtype"] = r.blob(), "image"
+					nz(at, "mime", r.mime)
+					nz(at, "size", r.size)
+					nz(at, "w", r.w)
+					nz(at, "h", r.h)
+					out = append(out, at)
+				}
+			}
+		}
+	}
+	if c.GetRavenMessage() != nil || c.GetRavenMessageMsgr() != nil {
+		out = append(out, base("ephemeral"))
+	}
+	return out
+}
+
+var mediaTypes = map[string]whatsmeow.MediaType{
+	"image": whatsmeow.MediaImage, "video": whatsmeow.MediaVideo, "audio": whatsmeow.MediaAudio,
+	"document": whatsmeow.MediaDocument, "linkthumb": whatsmeow.MediaLinkThumbnail,
+}
+
+var reqName = regexp.MustCompile(`^[0-9a-f]{8,64}(_p)?$`)
+
+// downloadE2EEMedia déchiffre un média chiffré et l'écrit dans media/<req> (dossier du compte, droits restreints).
+func downloadE2EEMedia(ctx context.Context, cli *whatsmeow.Client, blob, mtype, req string, max int64) (string, int64, error) {
+	if cli == nil {
+		return "", 0, fmt.Errorf("canal chiffré non connecté")
+	}
+	tries := []string{mtype}
+	if mtype == "xmapreview" { // type de clé inconnu pour les miniatures de messages enrichis : on essaie les deux
+		tries = []string{"image", "linkthumb"}
+	}
+	for _, t := range tries {
+		if _, ok := mediaTypes[t]; !ok {
+			return "", 0, fmt.Errorf("demande invalide")
+		}
+	}
+	if !reqName.MatchString(req) {
+		return "", 0, fmt.Errorf("demande invalide")
+	}
+	raw, err := base64.StdEncoding.DecodeString(blob)
+	if err != nil {
+		return "", 0, fmt.Errorf("blob invalide")
+	}
+	var integral waMediaTransport.WAMediaTransport_Integral
+	if err = proto.Unmarshal(raw, &integral); err != nil {
+		return "", 0, fmt.Errorf("blob invalide")
+	}
+	var data []byte
+	for _, t := range tries {
+		if data, err = cli.DownloadFB(ctx, &integral, mediaTypes[t]); err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return "", 0, err
+	}
+	if max > 0 && int64(len(data)) > max {
+		return "", 0, fmt.Errorf("fichier trop gros")
+	}
+	if err = os.MkdirAll("media", 0o700); err != nil {
+		return "", 0, err
+	}
+	path := filepath.Join("media", req)
+	if err = os.WriteFile(path, data, 0o600); err != nil {
+		return "", 0, err
+	}
+	return path, int64(len(data)), nil
+}
+
+// attachmentShapes résume les lignes de pièces jointes d'une table : types et indicateurs seulement (aucun contenu).
+func attachmentShapes(e *table.LSTable) []map[string]any {
+	var out []map[string]any
+	flag := func(table string, t table.AttachmentType, thread int64, msg string, vals map[string]string) {
+		m := map[string]any{"table": table, "type": int64(t), "thread0": thread == 0, "msg0": msg == ""}
+		for k, v := range vals {
+			m[k] = v != ""
+		}
+		out = append(out, m)
+	}
+	for _, x := range e.LSInsertAttachment {
+		flag("Attachment", x.AttachmentType, x.ThreadKey, x.MessageId, map[string]string{"playable": x.PlayableUrl, "preview": x.PreviewUrl, "title": x.TitleText})
+	}
+	for _, x := range e.LSInsertBlobAttachment {
+		flag("Blob", x.AttachmentType, x.ThreadKey, x.MessageId, map[string]string{"playable": x.PlayableUrl, "preview": x.PreviewUrl, "title": x.TitleText})
+	}
+	for _, x := range e.LSInsertXmaAttachment {
+		flag("Xma", x.AttachmentType, x.ThreadKey, x.MessageId, map[string]string{"playable": x.PlayableUrl, "preview": x.PreviewUrl, "image": x.ImageUrl, "action": x.ActionUrl, "title": x.TitleText})
+	}
+	for _, x := range e.LSInsertStickerAttachment {
+		flag("Sticker", 0, x.ThreadKey, x.MessageId, map[string]string{"playable": x.PlayableUrl, "preview": x.PreviewUrl})
+	}
+	return out
+}
