@@ -1368,3 +1368,276 @@ html.app{--sab:0px}
                 <ellipse cx="300" cy="518" rx="130" ry="22" fill="#2c211b" stroke="#ffc27a" stroke-width="1.8"/>
                 <ellipse cx="300" cy="516" rx="96" ry="12" fill="url(#fqGlow)"/>
                 <!-- point d'interrogation en verre -->
+                <path d="M172 196C172 118 226 74 296 74c78 0 128 46 128 112 0 62-44 90-84 118-30 22-42 42-42 84" fill="none" stroke="#ff8a3d" stroke-width="86" stroke-linecap="round" opacity=".5" filter="url(#fqBlur)"/>
+                <path d="M172 196C172 118 226 74 296 74c78 0 128 46 128 112 0 62-44 90-84 118-30 22-42 42-42 84" fill="none" stroke="url(#fqTube)" stroke-width="84" stroke-linecap="round"/>
+                <path d="M172 196C172 118 226 74 296 74c78 0 128 46 128 112 0 62-44 90-84 118-30 22-42 42-42 84" fill="none" stroke="url(#fqCore)" stroke-width="56" stroke-linecap="round"/>
+                <path d="M186 188C190 128 232 96 292 94" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="9" stroke-linecap="round"/>
+                <path d="M414 170c-6-40-40-66-86-70" fill="none" stroke="#ffd9bd" stroke-opacity=".8" stroke-width="5" stroke-linecap="round"/>
+                <circle cx="298" cy="446" r="46" fill="url(#fqTube)"/>
+                <circle cx="298" cy="446" r="31" fill="url(#fqCore)"/>
+                <path d="M270 432a30 30 0 0 1 22-14" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="5" stroke-linecap="round"/>
+                <!-- avant-plan : anneau -->
+                <path d="M30 340C120 430 400 470 580 290" transform="rotate(-4 300 340)" fill="none" stroke="url(#fqOr)" stroke-width="2.4" filter="url(#fqBlur2)" opacity=".9"/>
+                <!-- bulles et tuile flottantes -->
+                <g>
+                  <path d="M64 70h104a30 30 0 0 1 30 30v26a30 30 0 0 1-30 30h-40l-22 22v-22H64a30 30 0 0 1-30-30v-26a30 30 0 0 1 30-30z" fill="url(#fqTile)" stroke="#fff" stroke-width="2"/>
+                  <circle cx="86" cy="113" r="8" fill="#3a2e28"/><circle cx="116" cy="113" r="8" fill="#3a2e28"/><circle cx="146" cy="113" r="8" fill="#b8aba2"/>
+                </g>
+                <g>
+                  <path d="M476 262h60a26 26 0 0 1 26 26v50a26 26 0 0 1-26 26h-28l-20 18v-18h-12a26 26 0 0 1-26-26v-50a26 26 0 0 1 26-26z" transform="translate(-6 0)" fill="url(#fqTile)" stroke="#fff" stroke-width="2"/>
+                  <path d="M522 280 500 318h18l-6 26 26-40h-18z" fill="#ee5a12" transform="translate(-14 -4)"/>
+                </g>
+                <g>
+                  <rect x="48" y="400" width="86" height="86" rx="26" fill="url(#fqTile)" stroke="#fff" stroke-width="2"/>
+                  <path d="M91 418 69 427v19c0 14 9 25 22 30 13-5 22-16 22-30v-19z" fill="#3a2e28"/><path d="m81 446 8 8 13-14" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                </g>
+              </svg>
+            </div>
+            <div class="fq-ask">
+              <svg class="sp" viewBox="0 0 24 24"><use href="#i-spark"/></svg>
+              <div><b>Une autre question ?</b><span class="t">Outil personnel : le journal d'activité garde la trace de tout.</span></div>
+              <button id="l_open">Ouvrir l'interface<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></button>
+            </div>
+          </div>
+
+          <div class="fq-list">
+            <div class="fq-item open"><button class="fq-q" aria-expanded="true"><span class="fq-ic"><svg viewBox="0 0 24 24"><path d="M12 2.2 4.4 5.2v5.9c0 4.8 3.2 8.7 7.6 10.2 4.4-1.5 7.6-5.4 7.6-10.2V5.2z" fill="url(#gL)"/><path d="m8.5 12.2 2.6 2.6 4.5-5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>Relais est-il vraiment sécurisé ?</b><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="fq-a"><div><p>Tes conversations sont stockées sur le serveur du hub, dans ton espace privé, séparé des autres utilisateurs ; Relais ne les revend pas et ne les analyse pas pour autre chose. Seul le texte à rédiger part vers Claude, pour les conversations que tu as activées.</p></div></div></div>
+            <div class="fq-item"><button class="fq-q" aria-expanded="false"><span class="fq-ic"><svg viewBox="0 0 24 24"><path d="M13.6 1.8 4.6 13.7h6.3L9.8 22.2l9.6-12.4h-6.5z" fill="url(#gL)"/></svg></span><b>Comment connecter mon compte Messenger ?</b><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="fq-a"><div><p>Clique sur « Connecter mon compte » : la page officielle de Messenger s'ouvre dans ton navigateur (extension Relais Connect) ou dans l'application Android, tu t'y connectes toi-même, et ta session est envoyée à ton espace dès que c'est fait. Ton mot de passe ne passe jamais par Relais.</p></div></div></div>
+            <div class="fq-item"><button class="fq-q" aria-expanded="false"><span class="fq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#ee5a12" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="12" r="3.3"/><path d="M19.4 13a7.9 7.9 0 0 0 0-2l2-1.5-2-3.4-2.4 1a7.7 7.7 0 0 0-1.7-1L15 3.5h-4l-.4 2.6a7.7 7.7 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.5a7.9 7.9 0 0 0 0 2l-2 1.5 2 3.4 2.4-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.4 1 2-3.4z"/></svg></span><b>Puis-je personnaliser les réponses ?</b><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="fq-a"><div><p>Oui. Pour chaque conversation : le mode (désactivé, brouillon à valider ou automatique), des instructions et un ton sur mesure. Ton style est aussi appris à partir de tes vrais messages.</p></div></div></div>
+            <div class="fq-item"><button class="fq-q" aria-expanded="false"><span class="fq-ic"><svg viewBox="0 0 24 24"><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="#ee5a12" stroke-width="2.4" stroke-linecap="round"/><rect x="4.5" y="10" width="15" height="11.5" rx="3.2" fill="url(#gL)"/><circle cx="12" cy="15" r="1.5" fill="#fff"/><rect x="11.3" y="15.6" width="1.4" height="3" rx=".7" fill="#fff"/></svg></span><b>Relais fonctionne-t-il hors ligne ?</b><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="fq-a"><div><p>Non : il a besoin d'Internet pour parler à Messenger et au modèle d'IA. Il tourne sur le serveur du hub, en continu : pas besoin de laisser ton téléphone ou ton ordinateur allumé.</p></div></div></div>
+            <div class="fq-item"><button class="fq-q" aria-expanded="false"><span class="fq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#ee5a12" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><rect x="2.8" y="5" width="18.4" height="14" rx="3"/><path d="M2.8 10h18.4M6.5 15h4"/></svg></span><b>Est-ce que c'est gratuit ?</b><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="fq-a"><div><p>Relais n'a pas d'abonnement. Le coût vient du modèle d'IA (Claude) qui rédige les réponses : il dépend de ton propre accès ou de ta clé.</p></div></div></div>
+          </div>
+        </div>
+
+        <div class="fq-cta">
+          <span class="tile"><svg viewBox="0 0 24 24" fill="none" stroke="#ff8a3d" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M14.5 3.2c3 .3 5.6 2.9 5.9 5.9-1.3 4.1-4.2 7-8.3 8.6l-4.8-4.8C8.9 8.8 11.800 5 14.500 3.200z"/><circle cx="14.6" cy="9.4" r="1.7"/><path d="M7.300 12.700 4 13.500l1.800-3.400zM11.300 16.700 10.500 20l3.400-1.800zM6.500 17.500c-1.200.2-2 1-2.300 2.300 1.300-.3 2.100-1.100 2.300-2.300z"/></svg></span>
+          <div class="tx"><b>Prêt à commencer ?</b><span>Connectez votre compte et découvrez la puissance de Relais.</span></div>
+          <span class="sep"><i></i></span>
+          <button id="l_start2">Connecter mon compte<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></button>
+        </div>
+      </div>
+    </section>
+  </div>
+  <dialog class="lnfo" id="l_info"><h4 id="l_info_t"></h4><p id="l_info_p"></p><div style="display:flex;justify-content:flex-end"><button id="l_info_ok">Compris</button></div></dialog>
+</div>
+<div id="app">
+  <aside id="side">
+    <div class="sb-brand"><svg viewBox="0 0 44 44"><use href="#i-logo"/></svg><span>Relais</span></div>
+    <nav class="sb-nav" aria-label="Navigation">
+      <button class="nv on" id="nv_hub" data-view="hub"><i data-i="hub"></i><span>Hub</span><b class="nvc" id="nvc_hub"></b></button>
+      <button class="nv" id="nv_stats" data-view="stats"><i data-i="stats"></i><span>Statistiques</span></button>
+      <button class="nv" id="nv_hist"><i data-i="hist"></i><span>Historique</span></button>
+      <button class="nv" id="nv_log" data-view="log"><i data-i="log"></i><span>Journal</span></button>
+      <button class="nv" id="nv_sec" data-view="security"><i data-i="shield"></i><span>Sécurité</span></button>
+      <button class="nv" id="nv_set" data-view="settings"><i data-i="gear"></i><span>Paramètres</span></button>
+      <button class="nv" id="nv_help"><i data-i="help"></i><span>Aide</span></button>
+    </nav>
+    <div class="sb-foot">
+      <button class="sb-user" id="sb_user" title="Paramètres"><span id="sb_av"></span><div><b id="sb_name">Relais</b><span id="sb_role"></span></div></button>
+      <div class="sb-card"><span class="okc" id="sb_okc"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.500 4.500L19 7.500"/></svg></span><div><b id="sb_state">En ligne</b><span id="sb_ast">Assistant actif</span><span id="sb_ver" style="display:flex;align-items:center;gap:6px"></span></div></div>
+      <button class="sb-out" id="sb_out" style="display:none"><i data-i="out"></i><span>Se déconnecter</span></button>
+    </div>
+  </aside>
+
+  <div id="stage">
+    <div id="offline">Connexion au hub perdue : nouvelle tentative…</div>
+    <div id="banner">LLM en pause générale : aucune réponse automatique n'est envoyée.</div>
+    <header id="top">
+      <div id="sbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.500"/><path d="m16 16 4 4"/></svg><input type="text" id="search" placeholder="Rechercher une conversation…" autocomplete="off"><span class="kbd">⌘ K</span></div>
+      <span class="sp"></span>
+      <span class="pill" id="busy" style="display:none"></span>
+      <span class="status" id="top_state"><span class="dot on" id="top_dot"></span><span id="top_state_t">En ligne</span></span>
+      <button class="ib" id="bell" data-drop="bell_drop" aria-label="Notifications"><i data-i="bell"></i><span class="bn" id="bell_n"></span></button>
+      <div class="drop" id="bell_drop" style="right:70px;top:60px;width:330px"><div class="lab">À traiter</div><div id="bell_list"></div></div>
+      <div id="me">
+        <button id="mebtn" data-drop="medrop" title="Comptes et préférences"><span id="meav"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+        <div class="drop" id="medrop">
+          <div class="lab">Comptes</div>
+          <div id="accs"></div>
+          <div class="hr"></div>
+          <button class="it" id="bacc" title="Gérer les comptes Messenger"><span data-ic="user"></span><span>Gérer les comptes</span></button>
+          <div class="lab" id="me_name" style="display:none"></div>
+          <button class="it" id="busers" style="display:none"><span data-ic="user"></span><span>Utilisateurs</span></button>
+          <button class="it" id="bpw" style="display:none"><span data-ic="eye"></span><span>Changer mon mot de passe</span></button>
+          <button class="it" id="bapp"><span data-ic="theme"></span><span>Apparence et couleurs</span></button>
+          <button class="it" id="blogout" style="display:none"><span data-ic="user"></span><span>Se déconnecter</span></button>
+        </div>
+      </div>
+    </header>
+
+    <main id="hubmain">
+      <section id="list" class="panel">
+        <div id="tools">
+          <div id="tabs">
+            <button class="tab on" data-tab="all">Toutes<span class="ct" id="ct_all" style="display:none"></span></button>
+            <button class="tab" data-tab="unread" title="Conversations où des messages attendent ta réponse">Non lues<span class="ct" id="ct_unread">0</span></button>
+            <button class="tab" data-tab="groups">Groupes</button>
+          </div>
+          <button id="bfilter" data-drop="fpanel" title="Filtres et synchronisation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
+          <div class="drop" id="fpanel">
+            <div class="lab">Filtrer</div>
+            <select id="accfilter" style="display:none" title="Filtrer par compte"></select>
+            <label><input type="checkbox" id="onlyon"> Seulement celles où le LLM est actif</label>
+            <label><input type="checkbox" id="hideempty" checked> Masquer les conversations vides sans nom</label>
+            <div class="btns">
+              <button id="bsync" title="Relit les conversations actives pour rattraper les messages manqués">Tout synchroniser</button>
+              <button id="bthreads" title="Charge les conversations plus anciennes">Charger plus de conversations</button>
+            </div>
+          </div>
+        </div>
+        <div id="rows"><div style="padding:30px 18px;color:var(--muted);text-align:center">Chargement…</div></div>
+        <button id="bnew" title="Ajouter une conversation par identifiant Facebook"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Nouvelle conversation</button>
+      </section>
+      <section id="chatpane">
+        <div id="empty"><div class="ei"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 5.500h16v11H10l-4.500 3.500v-3.500H4z"/><path d="M8 10h8M8 13h5"/></svg></div><b class="t">Choisis une conversation</b>Le LLM ne répond <b>jamais</b> tant que tu ne l'actives pas pour elle.</div>
+      </section>
+      <aside id="rside" aria-label="Assistant et statistiques"></aside>
+    </main>
+
+    <div id="pages">
+      <section class="page" id="pg_stats"></section>
+      <section class="page" id="pg_security"></section>
+      <section class="page" id="pg_settings"></section>
+      <section class="page" id="pg_log"><h2>Journal d'activité</h2><p class="lead">Les décisions de l'assistant (jamais le texte de tes messages).</p><div class="card"><div id="logbox"></div></div></section>
+    </div>
+    <section class="page" id="pg_home"></section>
+
+    <div class="legacy">
+      <button id="bset"></button><button id="bstats"></button><button id="bhist"></button><button id="blog"></button><button id="tab_log"></button><button id="bhelp"></button><button id="bpause"></button>
+      <div id="chips">
+      <span class="chip" id="chip_state"><span class="od"></span><span id="chip_state_t">Relais est actif et écoute...</span></span>
+      <span class="sp"></span>
+      <span class="chip" id="count">LLM / h : 0</span>
+      <span class="chip" id="chip_mode" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg><span id="chip_mode_t"></span></span>
+      <span class="chip green" id="chip_sec"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 5.200v6c0 4.900 3.400 9 8 10.600 4.600-1.600 8-5.700 8-10.600v-6z"/><path d="m8.400 12.200 2.700 2.700 4.500-5" fill="none" stroke="#fff" stroke-width="2.200" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="chip_sec_t">Session sécurisée</span></span>
+    </div>
+    </div>
+  </div>
+
+  <nav id="tabbar" aria-label="Navigation mobile">
+    <button data-view="home" id="tb_home"><i data-i="hub"></i><span>Hub</span></button>
+    <button data-view="hub" id="tb_hub"><i data-i="chat"></i><span>Messages</span><b class="nvc" id="nvc_tb"></b></button>
+    <button data-view="stats" id="tb_stats"><i data-i="stats"></i><span>Stats</span></button>
+    <button data-view="security" id="tb_sec"><i data-i="shield"></i><span>Sécurité</span></button>
+    <button data-view="settings" id="tb_set"><i data-i="gear"></i><span>Réglages</span></button>
+  </nav>
+</div>
+
+<dialog id="dstats">
+  <div class="dh"><h3>Statistiques</h3><button class="x" data-close="dstats" aria-label="Fermer">×</button></div>
+  <div class="db">
+  <div class="hint" style="margin-top:0">Comptages seulement : le contenu des conversations n'est jamais utilisé ici.</div>
+  <div class="kpis" id="st_kpis"></div>
+  <b style="font-size:13px">Consommation du LLM</b>
+  <div id="st_usage" style="margin:6px 0 16px"></div>
+  <b style="font-size:13px">Messages par jour (14 derniers jours)</b>
+  <div class="statbars" id="st_bars"></div>
+  <div style="display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap"><span><i class="dot" style="background:#c9bfb8"></i> reçus</span><span><i class="dot" style="background:#3b2a20"></i> envoyés par toi</span><span><i class="dot" style="background:var(--accent)"></i> réponses du LLM</span></div>
+  </div>
+  <div class="df"><button id="st_close">Fermer</button></div>
+</dialog>
+<dialog id="dhelp">
+  <div class="dh"><h3>Aide</h3><button class="x" data-close="dhelp" aria-label="Fermer">×</button></div>
+  <div class="db" style="font-size:var(--fs-md);line-height:1.6;color:var(--text)">
+    <p><b>Rien n'est actif par défaut.</b> Pour chaque conversation, l'interrupteur à droite de la liste active ou non le LLM.</p>
+    <p><b>Modes.</b> <i>Brouillon</i> : le LLM prépare une réponse que tu valides. <i>Automatique</i> : il l'envoie après le délai choisi. Le mode se règle dans « Actions › Réglages de la conversation ».</p>
+    <p><b>Tu reprends la main.</b> Dès que tu écris toi-même dans une conversation, le LLM se tait un moment (réglable). « Pause générale » coupe tout en un clic.</p>
+    <p><b>Actions.</b> « Répondre maintenant » répond tout de suite, « Aperçu » montre ce que le LLM répondrait sans rien envoyer, « Préparer » propose des instructions à relire à partir de l'historique.</p>
+    <p><b>Non lues</b> = conversations où des messages attendent ta réponse (depuis ta dernière réponse ou celle du LLM).</p>
+    <p><b>Historique</b> : restaure l'historique des conversations chiffrées avec ton code PIN. <b>Journal</b> : ce que fait Relais, en direct.</p>
+    <p><b>Confidentialité.</b> Les conversations sont stockées sur le serveur du hub, dans un espace séparé par utilisateur ; le texte utile à une réponse est envoyé à Claude, seulement pour les conversations activées. Automatiser un compte personnel peut aller à l'encontre des conditions de Meta.</p>
+  </div>
+  <div class="df"><button id="hp_close">Fermer</button></div>
+</dialog>
+
+<dialog id="dacc" class="mdl">
+  <div class="dh mh">
+    <span class="mlogo"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="gmsg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#ff6a3d"/><stop offset=".5" stop-color="#d946ef"/><stop offset="1" stop-color="#6366f1"/></linearGradient></defs><path d="M24 4C12.400 4 4 12.600 4 23.200c0 5.600 2.400 10.600 6.200 14l.2 5.600 5.200-2.900c2.500.7 5 1.100 8.400 1.100 11.600 0 20-8.600 20-19.200S35.600 4 24 4z" fill="url(#gmsg)"/><path d="M11.500 27.500 20 18.700l5 4.600 9.500-8.800-8.100 10.300-5-4.600z" fill="#fff"/></svg></span>
+    <div class="mt"><h3>Comptes Messenger</h3><div class="msub">Connecte ton compte pour activer Relais</div></div>
+    <button class="x" data-close="dacc" aria-label="Fermer">×</button>
+  </div>
+  <div class="db">
+    <div id="a_reco" style="display:none"></div>
+    <div class="sbanner"><span class="sic" data-i="shield"></span><div class="sbt"><b>Connexion sécurisée</b><span>Ton mot de passe Messenger n'est jamais conservé.</span></div><button id="a_more" type="button">En savoir plus ›</button></div>
+    <div id="a_list"></div>
+    <div class="mcard add">
+      <div class="mh2"><span class="bic" data-i="bolt"></span><div><b>Ajouter ou reconnecter un compte</b><div class="msub" id="a_sub">Connecte ton compte pour activer Relais.</div></div></div>
+      <svg class="ill" viewBox="0 0 520 210" aria-hidden="true">
+        <defs>
+          <linearGradient id="il_ring" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="var(--accent)" stop-opacity=".15"/><stop offset=".25" stop-color="var(--accent-hover)"/><stop offset=".6" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-2)" stop-opacity=".25"/></linearGradient>
+          <linearGradient id="il_win" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26262d"/><stop offset="1" stop-color="#121216"/></linearGradient>
+          <linearGradient id="il_tile" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a3a43"/><stop offset="1" stop-color="#1b1b20"/></linearGradient>
+          <linearGradient id="il_arrow" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="var(--accent-2)"/><stop offset="1" stop-color="var(--accent-hover)"/></linearGradient>
+          <radialGradient id="il_floor" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="var(--accent)" stop-opacity=".45"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></radialGradient>
+          <filter id="il_glow" x="-10%" y="-20%" width="120%" height="140%"><feGaussianBlur stdDeviation="1.3"/></filter>
+          <filter id="il_soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1"/></filter>
+        </defs>
+        <ellipse cx="260" cy="176" rx="170" ry="22" fill="url(#il_floor)"/>
+        <!-- panneaux latéraux -->
+        <rect x="92" y="84" width="64" height="92" rx="9" fill="#15151a" stroke="#ffffff1c"/>
+        <rect x="384" y="112" width="58" height="58" rx="9" fill="#16161b" stroke="#ffffff1c"/><circle cx="420" cy="134" r="5" fill="#9a9aa5"/>
+        <!-- anneau lumineux (partie arrière) -->
+        <g transform="rotate(-7 260 100)">
+          <ellipse cx="260" cy="100" rx="196" ry="58" fill="none" stroke="var(--accent-hover)" stroke-width="4" opacity=".9" filter="url(#il_glow)"/>
+          <ellipse cx="260" cy="100" rx="196" ry="58" fill="none" stroke="url(#il_ring)" stroke-width="1.4"/>
+        </g>
+        <!-- fenêtre de navigateur -->
+        <rect x="170" y="30" width="196" height="136" rx="9" fill="url(#il_win)" stroke="#ffffff26" stroke-width="1.2"/>
+        <path d="M170 62h196" stroke="#ffffff14"/>
+        <circle cx="192" cy="46" r="5.5" fill="#ff5f57"/><circle cx="210" cy="46" r="5.5" fill="#febc2e"/><circle cx="228" cy="46" r="5.5" fill="#28c840"/>
+        <!-- anneau lumineux (partie avant) -->
+        <g transform="rotate(-7 260 100)">
+          <path d="M64 100a196 58 0 0 0 392 0" fill="none" stroke="var(--accent-hover)" stroke-width="4" opacity=".95" filter="url(#il_glow)"/>
+          <path d="M64 100a196 58 0 0 0 392 0" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width=".9"/><path d="M64 100a196 58 0 0 0 392 0" fill="none" stroke="url(#il_ring)" stroke-width="1.6"/>
+        </g>
+        <!-- tuile (téléphone) -->
+        <rect x="292" y="66" width="86" height="86" rx="11" fill="url(#il_tile)" stroke="#ffffff33" stroke-width="1.2"/>
+        <rect x="292" y="66" width="86" height="86" rx="11" fill="none" stroke="#ffffff12" stroke-width="6" opacity=".3"/>
+        <g transform="translate(335 109)">
+          <rect x="-15" y="-24" width="30" height="48" rx="7" fill="none" stroke="#e8e8ee" stroke-width="3.2"/>
+          <path d="M-5 -17h10" stroke="#e8e8ee" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M0 -8v13M-6 0l6 6 6-6" stroke="#e8e8ee" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+        <!-- flèche courbe -->
+        <path d="M214 140c6-26 30-38 62-30" fill="none" stroke="var(--accent-hover)" stroke-width="3.5" stroke-linecap="round" opacity=".9" filter="url(#il_soft)"/>
+        <path d="M214 140c6-26 30-38 62-30" fill="none" stroke="url(#il_arrow)" stroke-width="2.6" stroke-linecap="round"/>
+        <path d="M266 98l16 11-18 9" fill="none" stroke="url(#il_arrow)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div id="a_apkrow" style="display:none"><a class="btn primary bigbtn" id="a_apk" href="/relais.apk" download><span class="bi" data-i="dl"></span><span class="bt"><b>Télécharger l'application Android</b><small>Android 8 ou plus · connexion en quelques secondes</small></span></a></div>
+      <div class="hint" id="a_notool" style="display:none">Pour connecter un compte Messenger, <b>ouvre ce hub dans l'application Android Relais</b> : Messenger s'ouvre dans l'appli, tu te connectes toi-même, et ta session arrive ici. (Méthode avancée : coller une requête « Copy as cURL » ci-dessous.)</div>
+      <div class="arowbtn"><div class="hint" id="a_intro">Une fenêtre <b>Google Chrome</b> s'ouvre sur la <b>vraie page officielle</b> de Messenger. Connecte-toi <b>dans cette fenêtre</b> (mot de passe, code de vérification…). Ton mot de passe ne passe jamais par cette application : elle récupère seulement la session une fois connecté, puis la fenêtre se ferme. Un compte déjà connu est reconnu automatiquement (aucun nom à saisir).</div><button class="primary" id="a_go">Ouvrir la fenêtre de connexion</button><button id="a_cancel" style="display:none">Annuler</button></div>
+      <div id="a_status" class="hint" style="margin-top:10px"></div>
+      <details style="margin-top:14px"><summary style="cursor:pointer;color:var(--text-2);font-size:var(--fs-sm)">Autre méthode : coller une requête « Copy as cURL »</summary>
+      <div class="hint">Dans ton navigateur connecté à messenger.com : DevTools → Network → clic droit sur une requête → Copy → Copy as cURL. Utile quand le hub tourne sur un serveur distant.</div>
+      <textarea id="a_curl" placeholder="curl 'https://www.messenger.com/...' -H 'cookie: ...'"></textarea>
+      <button id="a_imp" style="margin-top:8px">Importer ce compte</button>
+    </details>
+    </div>
+    <button class="mrow" id="a_help" type="button"><span class="bic" data-i="help"></span><div><b>Besoin d'aide ?</b><span>Consulte le guide rapide</span></div><span class="chev" data-i="chev"></span></button>
+  </div>
+  <div class="df"><button id="a_close">Fermer</button></div>
+</dialog>
+
+<dialog id="dusers">
+  <div class="dh"><h3>Utilisateurs</h3><button class="x" data-close="dusers" aria-label="Fermer">×</button></div>
+  <div class="db">
+    <div class="hint" style="margin-top:0">Chaque utilisateur se connecte avec son identifiant et ne voit <b>que ses propres comptes Messenger</b>. Toi aussi, administrateur : tu gères les utilisateurs, mais tu ne lis pas leurs conversations.</div>
+    <div id="u_list" style="margin-top:12px"></div>
+    <div id="u_invites"></div>
+    <div id="u_unowned" class="hint"></div>
+  </div>
+  <div class="df"><button id="u_inv" class="primary">Inviter par lien</button><button id="u_add">Créer à la main</button><button id="u_close">Fermer</button></div>
+</dialog>
+
+<dialog id="dlogin">
+  <div class="dh"><h3>Connexion à Messenger</h3></div>
+  <div class="db">
+    <div class="hint" id="rl_hint" style="margin-top:0">Voici la <b>vraie page officielle</b> de Messenger, ouverte sur le serveur. Touche un champ, écris ton identifiant et ton mot de passe, puis valide : <b>c'est toi qui les saisis</b> ; ils ne sont jamais conservés, seule la session l'est. Cette fenêtre se ferme toute seule quand c'est fini.</div>
+    <div id="rl_wrap" style="margin-top:12px"><img id="rl_img" alt="Page de connexion Messenger" draggable="false"><div id="rl_load">Ouverture de Messenger…</div></div>
+    <input id="rl_kb" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="Clavier vers la page de connexion">
+    <div id="rl_bar"><button type="button" id="rl_kbd">⌨ Clavier</button><button type="button" id="rl_enter">↵ Entrée</button><button type="button" id="rl_back">⌫</button><button type="button" id="rl_tab">⇥ Tab</button></div>
+    <div id="rl_msg" class="hint"></div>
+  </div>
+  <div class="df"><button id="rl_cancel">Annuler</button></div>
+</dialog>
+
