@@ -1094,3 +1094,277 @@ html.app{--sab:0px}
 #dacc .acard{border-radius:12px;box-shadow:0 0 1px var(--neon-hot),0 0 3px color-mix(in srgb,var(--accent) 45%,transparent)}
 #dacc .acard.warn{box-shadow:0 0 1px var(--warn),0 0 3px color-mix(in srgb,var(--warn) 40%,transparent)}
 #dacc .mcard.add{border-radius:14px;box-shadow:0 0 1px var(--neon),0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+#dacc .bic{border-radius:9px}
+#dacc .avw .av{border-radius:50%}
+#dacc a.bigbtn{border-radius:11px;box-shadow:0 0 1px var(--neon-hot),0 0 4px color-mix(in srgb,var(--accent) 55%,transparent),inset 0 1px 0 #ffffff50}
+#dacc .arowbtn button,#dacc .acts button,#dacc .rm{border-radius:9px}
+#dacc .bdg{border-radius:7px}
+#dacc .mrow{border-radius:11px}
+#dacc .df button{border-radius:9px}
+@media (max-width:860px){#dacc.mdl{border-radius:14px}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <linearGradient id="gMg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#00b2ff"/><stop offset=".55" stop-color="#8a3ffc"/><stop offset="1" stop-color="#ff5c8a"/></linearGradient>
+    <linearGradient id="gL" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6893a"/><stop offset="1" stop-color="#e84a0c"/></linearGradient>
+    <linearGradient id="gOrb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff8a3d" stop-opacity="0"/><stop offset=".6" stop-color="#ff8a3d"/><stop offset="1" stop-color="#ffd2a8"/></linearGradient>
+    <symbol id="i-logo" viewBox="0 0 44 44"><rect x="3.5" y="4" width="24" height="21" rx="8" fill="none" stroke="url(#gL)" stroke-width="4"/><rect x="16.5" y="19" width="24" height="21" rx="8" fill="none" stroke="url(#gL)" stroke-width="4"/></symbol>
+    <symbol id="i-mg" viewBox="0 0 48 48"><path d="M24 3.5C12.2 3.5 3.5 12.2 3.5 23.3c0 5.9 2.5 11 6.5 14.4V44.5l6.6-3.6c2.2.6 4.5.9 7 .9 11.8 0 20.5-8.7 20.5-19.9S35.8 3.5 24 3.5z" fill="url(#gMg)"/><path d="M10.5 28l7.2-7.8 5.3 5.2 8.8-6.8-7.3 8.1-5.3-5.2z" fill="#fff"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 1.5c.6 5.6 4.9 9.9 10.5 10.5-5.6.6-9.9 4.9-10.5 10.5C11.4 16.9 7.1 12.6 1.5 12 7.1 11.4 11.4 7.1 12 1.5z" fill="currentColor"/></symbol>
+  </defs></svg>
+<div id="landing" data-theme="light">
+
+  <div class="page">
+    <section class="hero">
+    <div class="fx" aria-hidden="true">
+      <div class="base"></div><div class="arc a1"></div><div class="arc a2"></div><div class="arc a3"></div><div class="sphere"></div>
+      <svg class="rock" viewBox="0 0 520 360" preserveAspectRatio="none"><defs><linearGradient id="gR" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4a413c"/><stop offset="1" stop-color="#120e0d"/></linearGradient><linearGradient id="gR2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a5e57"/><stop offset="1" stop-color="#1b1513"/></linearGradient></defs>
+        <path d="M0 360V150c40 10 78 36 112 70 30 30 52 52 84 74 46 32 100 52 188 66z" fill="url(#gR)"/><path d="M0 360V240c34 14 62 38 92 66 30 26 70 40 118 54z" fill="url(#gR2)" opacity=".9"/><path d="M0 150c36 8 70 30 100 62-34-14-66-26-100-30z" fill="#7d6f66" opacity=".45"/></svg>
+    </div>
+      <nav class="nav in" aria-label="Navigation">
+        <a class="brand" href="#" data-go="top"><svg><use href="#i-logo"/></svg>Relais</a>
+        <div class="menu">
+          <a href="#" class="on" data-go="top">Accueil</a><a href="#" data-go="fonctionnalites">Fonctionnalités</a><a href="#" data-go="securite">Sécurité</a><a href="#" data-go="faq">FAQ</a>
+        </div>
+        <div class="navr">
+          <span class="where"><i></i>Hébergé • Espace privé</span>
+          <button class="theme" id="l_theme" title="Changer de thème" aria-label="Changer de thème"></button>
+        </div>
+      </nav>
+
+      <div class="grid in">
+        <div class="left">
+          <span class="chipx"><svg><use href="#i-spark"/></svg>Ton assistant de réponses</span>
+          <h1>Ta présence,<br><em>même</em> quand tu es absent.</h1>
+          <p class="lead">Relais apprend ton style et répond à ta place, avec intelligence et naturel.</p>
+          <div class="feats">
+            <div class="feat"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z"/></svg></span><span>Réponses<br>intelligentes</span></div>
+            <div class="feat"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.8 4.5 5.6v5.7c0 4.6 3.1 8.4 7.5 9.9 4.4-1.5 7.5-5.3 7.5-9.9V5.6z"/><path d="m8.8 12 2.4 2.4 4.2-4.6"/></svg></span><span>Contrôle<br>total</span></div>
+            <div class="feat"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><rect x="5" y="10.5" width="14" height="10" rx="3"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><circle cx="12" cy="15.5" r="1.2" fill="currentColor"/></svg></span><span>Espace<br>privé</span></div>
+          </div>
+
+          <div class="chat" aria-hidden="true">
+            <div class="hd"><svg class="mg"><use href="#i-mg"/></svg><b>Messenger</b><small><i></i>En ligne</small><span class="more"><span>···</span></span></div>
+            <div class="cr r1">
+              <span class="av"><svg viewBox="0 0 42 42"><rect width="42" height="42" fill="#f1d9c6"/><path d="M4 42c1-9 8-13 17-13s16 4 17 13z" fill="#2c2226"/><path d="M15.5 25h11v6c-2 2.2-9 2.2-11 0z" fill="#d49a79"/><circle cx="21" cy="17.5" r="7.6" fill="#e3ad8b"/><path d="M12.6 18c-1.4-8 3-11.6 8.6-11.6 6 0 10 4 8.4 11.6-.6-4-2.8-6.6-8.4-6.6-4.8 0-7.6 2.2-8.6 6.6z" fill="#1f1618"/><path d="M12.4 17.5c-.8 5 .2 9 1.6 11-2-.4-3.6-2.4-3.8-6z" fill="#1f1618"/></svg></span>
+              <span class="bb">Tu peux m'envoyer le document ?</span><time>21:24</time>
+            </div>
+            <div class="cr me r2"><time>21:25</time><span class="bb me">Bien sûr ! Je te l'envoie ce soir.</span><span class="av rel"><svg><use href="#i-logo"/></svg></span></div>
+            <div class="cr r3"><span class="typ"><i></i><i></i><i></i></span></div>
+          </div>
+        </div>
+
+        <div class="panelw">
+          <div class="gem" aria-hidden="true">
+            <svg class="orbit" viewBox="0 0 270 214"><ellipse cx="135" cy="107" rx="128" ry="44" transform="rotate(-16 135 107)" fill="none" stroke="url(#gOrb)" stroke-width="1.4"/><circle cx="250" cy="76" r="3.2" fill="#ffd2a8"/><circle cx="250" cy="76" r="9" fill="#ff8a3d" opacity=".25"/></svg>
+            <div class="tile"><svg><use href="#i-mg"/></svg></div>
+          </div>
+          <div class="panel">
+            <span class="step"><svg><use href="#i-spark"/></svg>Étape 1 sur 1</span>
+            <h2>Connecter ton compte</h2>
+            <p class="sub">Relie ton compte Messenger pour commencer.</p>
+            <ol class="steps">
+              <li data-n="1"><span class="num">1</span><div><b>Ouvre Messenger</b><span class="s-idle">Assure-toi d'être connecté à ton compte.</span><span class="s-wait">Connecte-toi sur la page de Messenger qui s'est ouverte.</span></div></li>
+              <li data-n="2"><span class="num">2</span><div><b>Autorise Relais</b><span>Accorde l'accès en toute sécurité.</span></div></li>
+              <li data-n="3"><span class="num">3</span><div><b>C'est prêt !</b><span>Ton assistant est prêt à fonctionner.</span></div></li>
+            </ol>
+            <button class="cta" id="l_go"><svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg><i class="spin" aria-hidden="true"></i><span class="lbl">Connecter mon compte</span></button>
+            <div class="state" id="l_status" role="status" aria-live="polite"></div>
+            <button class="later" id="l_cancel">Annuler</button>
+            <button class="later" id="l_later">Ou continuer plus tard</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="proof in">
+        <div><span class="stack"><i style="background:linear-gradient(135deg,#f6b48a,#e8793c)"></i><i style="background:linear-gradient(135deg,#6b5a52,#2c211c)"></i><i style="background:linear-gradient(135deg,#ffd9b8,#d98a5a)"></i></span>Plusieurs comptes, chacun isolé</div>
+        <div><svg viewBox="0 0 24 24"><path d="M12 2.6 4.4 5.5v5.6c0 4.7 3.2 8.6 7.6 10.1 4.4-1.5 7.6-5.4 7.6-10.1V5.5z" fill="#22b45a"/><path d="m8.6 12 2.5 2.5 4.4-4.8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Tes données restent dans ton espace privé</div>
+        <div><svg viewBox="0 0 24 24"><path d="M13.2 2 4.5 13.6h6.3L9.6 22l9.1-12.2h-6.5z" fill="#ff9d2e"/></svg>Activation en 1 clic</div>
+      </div>
+    </section>
+
+    <section class="fn" id="s-fonctionnalites">
+      <div class="fn-bg" aria-hidden="true">
+        <div class="tl"></div><div class="rim"></div><div class="arc a1"></div><div class="arc a2"></div><div class="blob"></div><div class="glow"></div>
+        <svg class="thin" viewBox="0 0 800 600" preserveAspectRatio="none"><defs><linearGradient id="gTh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d" stop-opacity="0"/><stop offset=".7" stop-color="#ff8a3d" stop-opacity=".9"/><stop offset="1" stop-color="#ffd2a8" stop-opacity="0"/></linearGradient></defs><path d="M120 40C420 -20 760 140 700 420c-20 90-60 150-100 190" fill="none" stroke="url(#gTh)" stroke-width="1.6"/><circle cx="650" cy="132" r="3" fill="#ffd2a8"/></svg>
+      </div>
+      <div class="fn-in">
+        <div class="fn-head">
+          <span class="chipx"><svg><use href="#i-spark"/></svg>Fonctionnalités</span>
+          <h2>Une intelligence qui<br><em>travaille</em> pour toi.</h2>
+          <p>Relais combine apprentissage, contrôle et automatisation pour gérer vos conversations Messenger avec élégance.</p>
+          <hr>
+        </div>
+
+        <div class="fn-main">
+          <div class="fn-col">
+            <article class="fn-card"><span class="fn-ico"><svg viewBox="0 0 24 24"><path d="M13.6 1.8 4.6 13.7h6.3L9.8 22.2l9.6-12.4h-6.5z" fill="url(#gL)"/></svg></span><div><b>Apprentissage Intelligent</b><span class="d">Relais apprend ton style d'écriture et s'adapte à ta façon de parler.</span></div><span class="fn-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></span></article>
+            <article class="fn-card"><span class="fn-ico" style="color:#17110e"><svg viewBox="0 0 24 24"><path d="M12 2.2 4.4 5.2v5.9c0 4.8 3.2 8.7 7.6 10.2 4.4-1.5 7.6-5.4 7.6-10.2V5.2z" fill="currentColor"/><path d="m8.5 12.2 2.6 2.6 4.5-5" fill="none" style="stroke:var(--bg)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><b>Contrôle Total</b><span class="d">Décide quand et comment Relais répond à tes messages.</span></div><span class="fn-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></span></article>
+            <article class="fn-card"><span class="fn-ico" style="color:#17110e"><svg viewBox="0 0 24 24"><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><rect x="4.5" y="10" width="15" height="11.5" rx="3.2" fill="currentColor"/><circle cx="12" cy="15" r="1.6" style="fill:var(--bg)"/><rect x="11.2" y="15.6" width="1.6" height="3" rx=".8" style="fill:var(--bg)"/></svg></span><div><b>Espace privé</b><span class="d">Tes conversations sont stockées dans ton espace, séparé des autres utilisateurs.</span></div><span class="fn-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></span></article>
+          </div>
+
+          <div class="fn-stage" aria-hidden="true">
+            <div class="fn-dash">
+              <aside class="fn-side">
+                <div class="lg"><svg><use href="#i-logo"/></svg>Relais</div>
+                <div class="it on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 3 10.6V21h6.2v-6h5.6v6H21V10.6z"/></svg>Accueil</div>
+                <div class="it"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>Conversations</div>
+                <div class="it"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M5.5 18.5l2.1-2.1M16.4 7.6l2.1-2.1" stroke-linecap="round"/></svg>Paramètres</div>
+                <div class="it"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 20V11M12 20V5M18 20v-6"/></svg>Statistiques</div>
+                <div class="it"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1.9-1.1 1.8M12 17v.1"/></svg>Aide</div>
+                <div class="conn"><i></i><div><b>Connecté</b><small>Messenger</small></div></div>
+              </aside>
+              <div class="fn-mn">
+                <div class="fn-top">
+                  <div><h5>Bienvenue, Fabrich 👋</h5><small>Ton assistant est prêt à répondre.</small></div>
+                  <div class="r"><span class="fn-on"><i></i>Actif</span><span class="fn-ava"><svg viewBox="0 0 42 42"><rect width="42" height="42" fill="#f1d9c6"/><path d="M4 42c1-9 8-13 17-13s16 4 17 13z" fill="#2c2226"/><path d="M15.5 25h11v6c-2 2.2-9 2.2-11 0z" fill="#d49a79"/><circle cx="21" cy="17.5" r="7.6" fill="#e3ad8b"/><path d="M12.6 18c-1.4-8 3-11.6 8.6-11.6 6 0 10 4 8.4 11.6-.6-4-2.8-6.6-8.4-6.6-4.8 0-7.6 2.2-8.6 6.6z" fill="#1f1618"/><path d="M12.4 17.5c-.8 5 .2 9 1.6 11-2-.4-3.6-2.4-3.8-6z" fill="#1f1618"/></svg></span></div>
+                </div>
+                <div class="fn-two">
+                  <div class="fn-box"><h6>Mode actuel <span style="color:#8d837b;font-weight:400">ⓘ</span></h6><div class="fn-mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M21 3 3 10.5l6.5 2.5L12 20z"/><path d="m21 3-11.5 10"/></svg><div><b>Brouillon</b><small>Relais prépare, tu valides.</small></div><span class="ch">›</span></div></div>
+                  <div class="fn-box fn-kpi"><h6>Messages traités</h6><div class="n">1.2K</div><span class="up">↑ +12%</span><svg class="spk" viewBox="0 0 120 60" preserveAspectRatio="none"><defs><linearGradient id="gSp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ee5a12" stop-opacity=".25"/><stop offset="1" stop-color="#ee5a12" stop-opacity="0"/></linearGradient></defs><path d="M0 48 14 40 26 44 40 30 54 36 68 24 82 30 96 14 108 20 120 4V60H0z" fill="url(#gSp)"/><path d="M0 48 14 40 26 44 40 30 54 36 68 24 82 30 96 14 108 20 120 4" fill="none" stroke="#ee5a12" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></div>
+                </div>
+                <div class="fn-box fn-conv"><h6>Aperçu de la conversation <small>Voir plus →</small></h6>
+                  <div class="fn-m"><span class="fn-ava" style="width:3.4em;height:3.4em"><svg viewBox="0 0 42 42"><rect width="42" height="42" fill="#f1d9c6"/><path d="M4 42c1-9 8-13 17-13s16 4 17 13z" fill="#2c2226"/><path d="M15.5 25h11v6c-2 2.2-9 2.2-11 0z" fill="#d49a79"/><circle cx="21" cy="17.5" r="7.6" fill="#e3ad8b"/><path d="M12.6 18c-1.4-8 3-11.6 8.6-11.6 6 0 10 4 8.4 11.6-.6-4-2.8-6.6-8.4-6.6-4.8 0-7.6 2.2-8.6 6.6z" fill="#1f1618"/></svg></span><span class="bb2">Tu peux m'envoyer le document ?</span><time>21:24</time></div>
+                  <div class="fn-m me"><span class="bb2">Bien sûr ! Je te l'envoie ce soir.</span><time>21:25</time><span class="av3"><svg><use href="#i-logo"/></svg></span></div>
+                  <div class="fn-in2"><span class="dt"><i></i><i></i></span>Écrire une réponse…<span class="sd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 3 10.5l6.5 2.5L12 20z"/></svg></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fn-col">
+            <article class="fn-card"><span class="fn-ico"><svg viewBox="0 0 24 24"><path d="M12.2 1.8c3.3 2 5.2 5.4 4.8 9.3l-1.7 3.4H9.1L7.4 11C7 7.2 8.9 3.8 12.2 1.8z" fill="url(#gL)"/><circle cx="12.2" cy="9" r="1.9" style="fill:var(--bg)"/><path d="M8.2 13.6 4.6 15.5l.8 4.2 3.6-2.7zM16.2 13.6l3.6 1.9-.8 4.2-3.6-2.7z" fill="url(#gL)"/><path d="M10 17.6h4.4l-1 4.6a.5.5 0 0 1-.9 0z" fill="#ffb066"/></svg></span><div><b>Réponses Automatiques</b><span class="d">Active l'envoi automatique ou valide avant envoi.</span></div><span class="fn-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></span></article>
+            <article class="fn-card"><span class="fn-ico"><svg viewBox="0 0 24 24"><rect x="3.5" y="12" width="5" height="9" rx="1.6" fill="url(#gL)"/><rect x="9.8" y="5" width="5" height="16" rx="1.6" fill="url(#gL)"/><rect x="16.1" y="9" width="5" height="12" rx="1.6" fill="url(#gL)"/></svg></span><div><b>Suivi en Temps Réel</b><span class="d">Visualise l'activité, les réponses et les performances.</span></div><span class="fn-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></span></article>
+            <article class="fn-card"><span class="fn-ico" style="color:#17110e"><svg viewBox="0 0 24 24"><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.1 11.9 1 10.5 1S8 2.1 8 3.5V5H4c-1.1 0-2 .9-2 2v3.8h1.5c1.5 0 2.7 1.2 2.7 2.7S5 16.2 3.5 16.2H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.5 1.2-2.7 2.7-2.7s2.7 1.2 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.4 0 2.5-1.1 2.5-2.5S21.9 11 20.5 11z" fill="currentColor"/></svg></span><div><b>Personnalisation Avancée</b><span class="d">Définis des règles, un ton et des exceptions sur mesure.</span></div><span class="fn-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></span></article>
+          </div>
+        </div>
+
+      </div>
+    </section>
+    <section class="sc" id="s-securite">
+      <div class="sc-bg" aria-hidden="true">
+        <div class="dk"></div><div class="floor"></div><div class="arc a1"></div><div class="arc a2"></div>
+        <svg class="sw" viewBox="0 0 700 940" preserveAspectRatio="none"><defs><linearGradient id="scSw" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#ff8a3d" stop-opacity="0"/><stop offset=".5" stop-color="#ff9a5a" stop-opacity=".9"/><stop offset="1" stop-color="#ffd2a8" stop-opacity="0"/></linearGradient></defs>
+          <path d="M20 330C60 150 230 40 430 20" fill="none" stroke="url(#scSw)" stroke-width="2.2"/><path d="M0 520C20 400 90 300 190 240" fill="none" stroke="#ffffff40" stroke-width="1"/></svg>
+      </div>
+      <div class="sc-in">
+        <div class="sc-head">
+          <span class="chipx"><svg viewBox="0 0 24 24"><path d="M12 1.8 3.6 5v6.4c0 5 3.5 9.3 8.4 10.8 4.9-1.5 8.4-5.8 8.4-10.8V5z" fill="#ee5a12"/><path d="m8.4 12 2.7 2.7 4.6-5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Sécurité</span>
+          <h2>Vos données, notre <em>priorité.</em></h2>
+          <p>Relais est conçu pour respecter votre vie privée et garantir une utilisation sûre, transparente et maîtrisée.</p>
+          <hr>
+        </div>
+
+        <div class="sc-main">
+          <div class="sc-art" aria-hidden="true">
+            <svg class="art" viewBox="0 0 640 560" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <linearGradient id="scOr" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff8a3d" stop-opacity="0"/><stop offset=".35" stop-color="#ff9a5a"/><stop offset=".7" stop-color="#ffd2a8"/><stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/></linearGradient>
+                <linearGradient id="scGl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset=".5" stop-color="#e9ddd4" stop-opacity=".35"/><stop offset="1" stop-color="#ffb37a" stop-opacity=".5"/></linearGradient>
+                <linearGradient id="scRim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".6" stop-color="#e8d9cd"/><stop offset="1" stop-color="#ff9a5a"/></linearGradient>
+                <linearGradient id="scIn" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d8cdc4" stop-opacity=".55"/><stop offset=".45" stop-color="#4a3b33" stop-opacity=".92"/><stop offset="1" stop-color="#17100d"/></linearGradient>
+                <linearGradient id="scLk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff6ee"/><stop offset="1" stop-color="#cfb7a4"/></linearGradient>
+                <linearGradient id="scSh" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f4eee8"/><stop offset=".5" stop-color="#a99d94"/><stop offset="1" stop-color="#ece4dd"/></linearGradient>
+                <linearGradient id="scDisc" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6b5547"/><stop offset=".5" stop-color="#2a1f19"/><stop offset="1" stop-color="#7d6354"/></linearGradient>
+                <radialGradient id="scGlow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffb066" stop-opacity=".95"/><stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/></radialGradient>
+                <filter id="scBlur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="4"/></filter>
+              </defs>
+              <!-- halo et anneaux arrière -->
+              <ellipse cx="320" cy="430" rx="250" ry="46" fill="url(#scGlow)" opacity=".7" filter="url(#scBlur)"/>
+              <ellipse cx="318" cy="330" rx="300" ry="74" transform="rotate(-9 318 330)" fill="none" stroke="url(#scOr)" stroke-width="3.2" filter="url(#scBlur)" opacity=".85"/>
+              <ellipse cx="318" cy="330" rx="300" ry="74" transform="rotate(-9 318 330)" fill="none" stroke="url(#scOr)" stroke-width="1.6"/>
+              <ellipse cx="300" cy="440" rx="270" ry="52" fill="none" stroke="url(#scOr)" stroke-width="1.2" opacity=".7"/>
+              <!-- socle -->
+              <g>
+                <path d="M92 505v-22c0-26 100-42 228-42s228 16 228 42v22c0 26-100 42-228 42S92 531 92 505z" fill="url(#scDisc)"/>
+                <ellipse cx="320" cy="483" rx="228" ry="42" fill="#3a2b22" stroke="#ff9a5a" stroke-opacity=".55" stroke-width="1.4"/>
+                <path d="M150 478v-24c0-20 78-32 170-32s170 12 170 32v24c0 20-78 32-170 32s-170-12-170-32z" fill="url(#scDisc)"/>
+                <ellipse cx="320" cy="454" rx="170" ry="30" fill="#2c211b" stroke="#ffb066" stroke-opacity=".8" stroke-width="1.6"/>
+                <path d="M210 442v-18c0-14 48-22 110-22s110 8 110 22v18c0 14-48 22-110 22s-110-8-110-22z" fill="url(#scDisc)"/>
+                <ellipse cx="320" cy="424" rx="110" ry="19" fill="#241a15" stroke="#ffc27a" stroke-width="1.8"/>
+                <ellipse cx="320" cy="422" rx="86" ry="12" fill="url(#scGlow)"/>
+              </g>
+              <!-- bouclier de verre -->
+              <g transform="translate(155 40)">
+                <path d="M165 0C130 24 78 40 22 44c-6 0-10 4-10 10v121c0 110 58 185 153 233 95-48 153-123 153-233V54c0-6-4-10-10-10C252 40 200 24 165 0z" fill="url(#scGl)" stroke="url(#scRim)" stroke-width="4"/>
+                <path d="M165 22C136 42 92 56 46 60c-3 0-5 2-5 5v110c0 98 50 164 124 207 74-43 124-109 124-207V65c0-3-2-5-5-5-46-4-90-18-119-38z" fill="url(#scIn)"/>
+                <path d="M165 22C136 42 92 56 46 60" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2"/>
+                <path d="M30 170v10c0 100 44 168 135 218" fill="none" stroke="#ff9a5a" stroke-opacity=".7" stroke-width="2.4" filter="url(#scBlur)"/>
+                <!-- cadenas -->
+                <path d="M126 186v-42a39 39 0 0 1 78 0v42" fill="none" stroke="url(#scSh)" stroke-width="20" stroke-linecap="round"/>
+                <rect x="98" y="176" width="134" height="112" rx="28" fill="url(#scLk)" stroke="#fff" stroke-opacity=".8"/>
+                <rect x="98" y="258" width="134" height="30" rx="14" fill="#b89d88" opacity=".35"/>
+                <circle cx="165" cy="222" r="15" fill="#6b4632"/>
+                <path d="M158 228h14l5 38h-24z" fill="#6b4632"/>
+              </g>
+              <!-- anneau avant -->
+              <path d="M30 372C120 440 400 450 600 288" transform="rotate(-9 318 330)" fill="none" stroke="url(#scOr)" stroke-width="3" filter="url(#scBlur)" opacity=".9"/>
+              <path d="M30 372C120 440 400 450 600 288" transform="rotate(-9 318 330)" fill="none" stroke="url(#scOr)" stroke-width="1.6"/>
+            </svg>
+            <div class="sc-tag"><b><i></i>Espace privé<span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></b><span>Chaque utilisateur a son espace, séparé des autres.</span></div>
+          </div>
+
+          <div class="sc-right">
+            <div class="sc-cards">
+              <article class="sc-card"><span class="fn-ico"><svg viewBox="0 0 24 24"><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="#ee5a12" stroke-width="2.4" stroke-linecap="round"/><rect x="4.5" y="10" width="15" height="11.5" rx="3.2" fill="url(#gL)"/><circle cx="12" cy="15" r="1.5" fill="#fff"/><rect x="11.3" y="15.6" width="1.4" height="3" rx=".7" fill="#fff"/></svg></span><div><b>Espace privé</b><span class="d">Vos conversations sont stockées dans votre espace, séparé des autres utilisateurs.</span></div><button class="sc-go" data-info="locales" aria-label="En savoir plus : Données locales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></button></article>
+              <article class="sc-card"><span class="fn-ico"><svg viewBox="0 0 24 24"><path d="M12 2.2 4.4 5.2v5.9c0 4.8 3.2 8.7 7.6 10.2 4.4-1.5 7.6-5.4 7.6-10.2V5.2z" fill="url(#gL)"/><path d="m8.5 12.2 2.6 2.6 4.5-5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><b>Connexion sécurisée</b><span class="d">Une connexion protégée par les standards modernes.</span></div><button class="sc-go" data-info="connexion" aria-label="En savoir plus : Connexion sécurisée"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></button></article>
+              <article class="sc-card"><span class="fn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#ee5a12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 20 20 4" stroke-width="2.4"/></svg></span><div><b>Contrôle total</b><span class="d">Vous décidez quand et comment Relais répond.</span></div><button class="sc-go" data-info="controle" aria-label="En savoir plus : Contrôle total"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></button></article>
+              <article class="sc-card"><span class="fn-ico"><svg viewBox="0 0 24 24"><path d="M13.6 1.8 4.6 13.7h6.3L9.8 22.2l9.6-12.4h-6.5z" fill="url(#gL)"/></svg></span><div><b>Aucune revente</b><span class="d">Rien n'est revendu ni analysé pour autre chose que tes réponses.</span></div><button class="sc-go" data-info="collecte" aria-label="En savoir plus : Aucune revente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></button></article>
+            </div>
+            <div class="sc-trust">
+              <span class="tile"><svg viewBox="0 0 24 24" fill="none" stroke="#ff8a3d" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.4 4.6 5.3v5.8c0 4.6 3.1 8.4 7.4 9.9 4.3-1.5 7.4-5.3 7.4-9.9V5.3z"/><path d="m8.7 12.2 2.4 2.4 4.3-4.7"/></svg></span>
+              <span class="sep"></span>
+              <div class="tx"><b>Fiable et transparent</b><span>Relais s'engage à respecter votre vie privée, avec une technologie éthique et une transparence totale sur son fonctionnement.</span></div>
+              <button data-info="transparence">En savoir plus<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sc-bar">
+          <div class="l"><b>Une confiance partagée</b><span>Conçu pour tes propres comptes, sous ton contrôle.</span></div>
+          <div class="pt"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="currentColor"/><path d="M11 29.5l8-8.6 5.8 5.7 9.6-7.4-8 8.9-5.8-5.7z" fill="#fff"/></svg><div><b>Messenger</b><span>Compatible</span></div></div>
+          <div class="pt"><svg viewBox="0 0 24 24"><path d="M12 2 4 5.2v6c0 4.9 3.4 9 8 10.6 4.6-1.6 8-5.7 8-10.6v-6z" fill="currentColor"/><path d="m8.4 12.2 2.7 2.7 4.5-5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Sécurité</b><span>Renforcée</span></div></div>
+          <div class="pt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M13.6 2 4.8 13.6h6.3L9.9 22l8.9-12.2h-6.4z"/></svg><div><b>Performance</b><span>Optimale</span></div></div>
+          <div class="pt one"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 20.8S3 15.2 3 8.9C3 6.2 5 4.2 7.5 4.2c1.8 0 3.4 1 4.5 2.6 1.1-1.6 2.7-2.6 4.5-2.6C19 4.2 21 6.2 21 8.9c0 6.3-9 11.9-9 11.9z"/></svg><div><b>Respect de votre vie privée</b></div></div>
+        </div>
+      </div>
+    </section>
+    <section class="fq" id="s-faq">
+      <div class="fq-bg" aria-hidden="true">
+        <div class="dk"></div><div class="arc a1"></div><div class="arc a2"></div>
+        <svg class="sw" viewBox="0 0 1000 600" preserveAspectRatio="none"><defs><linearGradient id="fqSw" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#ff8a3d" stop-opacity="0"/><stop offset=".55" stop-color="#ff9a5a" stop-opacity=".95"/><stop offset="1" stop-color="#ffd2a8" stop-opacity="0"/></linearGradient></defs>
+          <path d="M-20 170C60 60 200 0 330 -10" fill="none" stroke="url(#fqSw)" stroke-width="1.6"/><path d="M10 620C400 540 760 470 1020 430" fill="none" stroke="url(#fqSw)" stroke-width="1.4" opacity=".7"/><path d="M640 -10C760 100 900 150 1020 130" fill="none" stroke="#ffffff66" stroke-width="1"/></svg>
+      </div>
+      <div class="fq-in">
+        <div class="fq-head">
+          <span class="chipx"><span class="qm">?</span>FAQ</span>
+          <h2>Questions <em>fréquentes</em></h2>
+          <p>Trouvez rapidement les réponses à vos questions sur Relais.</p>
+          <hr>
+        </div>
+        <div class="fq-main">
+          <div class="fq-left">
+            <div class="fq-art" aria-hidden="true">
+              <svg class="art" viewBox="0 0 600 600" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                  <linearGradient id="fqTube" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".35" stop-color="#e7d7cb"/><stop offset=".7" stop-color="#ffb37a"/><stop offset="1" stop-color="#ff7a2e"/></linearGradient>
+                  <linearGradient id="fqCore" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8d7769"/><stop offset=".5" stop-color="#3b2e27"/><stop offset="1" stop-color="#17100d"/></linearGradient>
+                  <linearGradient id="fqOr" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff8a3d" stop-opacity="0"/><stop offset=".4" stop-color="#ff9a5a"/><stop offset=".75" stop-color="#ffd2a8"/><stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/></linearGradient>
+                  <linearGradient id="fqDisc" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6b5547"/><stop offset=".5" stop-color="#2a1f19"/><stop offset="1" stop-color="#7d6354"/></linearGradient>
+                  <linearGradient id="fqTile" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#f1e4da" stop-opacity=".7"/></linearGradient>
+                  <radialGradient id="fqGlow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffb066" stop-opacity=".95"/><stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/></radialGradient>
+                  <filter id="fqBlur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="9"/></filter>
+                  <filter id="fqBlur2" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3"/></filter>
+                </defs>
+                <!-- anneaux et halo -->
+                <ellipse cx="300" cy="300" rx="285" ry="86" transform="rotate(-8 300 300)" fill="none" stroke="url(#fqOr)" stroke-width="1.6" opacity=".8"/>
+                <ellipse cx="300" cy="360" rx="250" ry="70" transform="rotate(6 300 360)" fill="none" stroke="url(#fqOr)" stroke-width="1.2" opacity=".6"/>
+                <ellipse cx="300" cy="520" rx="230" ry="46" fill="url(#fqGlow)" opacity=".7" filter="url(#fqBlur2)"/>
+                <!-- socle -->
+                <path d="M100 560v-18c0-22 90-36 200-36s200 14 200 36v18c0 22-90 36-200 36S100 582 100 560z" fill="url(#fqDisc)"/>
+                <ellipse cx="300" cy="542" rx="200" ry="36" fill="#3a2b22" stroke="#ff9a5a" stroke-opacity=".6" stroke-width="1.4"/>
+                <path d="M170 536v-18c0-15 62-24 130-24s130 9 130 24v18c0 15-62 24-130 24s-130-9-130-24z" fill="url(#fqDisc)"/>
+                <ellipse cx="300" cy="518" rx="130" ry="22" fill="#2c211b" stroke="#ffc27a" stroke-width="1.8"/>
+                <ellipse cx="300" cy="516" rx="96" ry="12" fill="url(#fqGlow)"/>
+                <!-- point d'interrogation en verre -->
