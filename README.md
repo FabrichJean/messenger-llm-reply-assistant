@@ -155,9 +155,9 @@ La connexion Messenger se fait dans l'application, sur `messenger.com`. Le mot d
 │   │   ├── events.py attachments.py previews.py     Événements entrants, pièces jointes, aperçus de liens
 │   │   ├── sync.py tasks.py                         Synchronisation de l'historique, tâches de fond
 │   │   ├── llm/                                     Prompts, réponses, mémoire, style, humanisation, garde-fous
-│   │   └── web/                                     Serveur HTTP, routes de l'API, utilisateurs
+│   │   └── web/                                     Serveur HTTP, pages (assemblage de ui/), routes de l'API, utilisateurs
 │   ├── users_cli.py adopt_account.py                Outils en ligne de commande
-│   └── index.html login.html join.html              Interface web
+│   └── ui/                                          Interface web : index.html (squelette), css/, js/, login.html, join.html
 ├── mobile/                                          Application Android (WebView)
 ├── extension/                                       Extension « Relais Connect »
 ├── deploy/                                          Guide VPS, Caddy, sauvegardes, envoi de comptes

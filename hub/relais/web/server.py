@@ -22,6 +22,7 @@ from ..db import q
 from ..login import LOGIN, _lkey, ext_import, ext_zip
 from ..previews import serve_linkimg
 from ..tls import SSL_CTX
+from .pages import page
 from .readers import api_chat, api_state, api_stats
 from .routes import post
 
@@ -133,7 +134,7 @@ class Handler(BaseHTTPRequestHandler):
         return SECURE_COOKIE or (TRUST_PROXY and self.headers.get("X-Forwarded-Proto", "") == "https")
 
     def _login_page(self):
-        body = (HERE / "login.html").read_bytes()
+        body = page("login.html")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -154,7 +155,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(out)
 
     def _page(self, name):
-        body = (HERE / name).read_bytes()
+        body = page(name)
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -196,7 +197,7 @@ class Handler(BaseHTTPRequestHandler):
             if u.path in ("/", "/index.html"):
                 if "RelaisApp" in self.headers.get("User-Agent", ""):   # l'application Android va directement à la connexion
                     return self._login_page()
-                body = (HERE / "index.html").read_bytes().replace(b"<body>", b'<body data-public="1">', 1)   # page d'accueil publique : aucune donnée, seulement l'interface statique
+                body = page("index.html").replace(b"<body>", b'<body data-public="1">', 1)   # page d'accueil publique : aucune donnée, seulement l'interface statique
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -213,7 +214,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _route_get(self, u):
         if u.path in ("/", "/index.html"):
-            body = (HERE / "index.html").read_bytes()
+            body = page("index.html")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
