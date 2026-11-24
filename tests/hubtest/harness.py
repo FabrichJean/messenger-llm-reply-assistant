@@ -60,7 +60,7 @@ class Http:
 
 class TestHub:
     """Un hub jetable. accounts : {nom_compte: propriétaire (ou None)}."""
-    def __init__(self, accounts=None, hub_py=None):
+    def __init__(self, accounts=None, hub_py=None, env=None):
         self.hub_py = Path(hub_py) if hub_py else HUB          # autre version du hub (test différentiel)
         self.tmp = Path(tempfile.mkdtemp(prefix="relais-test-"))
         self.data = self.tmp / "data"; self.data.mkdir()
@@ -72,12 +72,13 @@ class TestHub:
             cfg.append({"name": name, "label": name.capitalize(), "owner": owner, "dir": str(d), "bin": str(FAKE_CLIENT), "args": []})
         (self.data / "accounts.json").write_text(json.dumps(cfg))
         (self.tmp / "home").mkdir()
+        self.extra_env = dict(env or {})
         self.proc = None
 
     def start(self):
         env = {"PATH": os.environ.get("PATH", ""), "HOME": str(self.tmp / "home"), "HUB_DATA": str(self.data), "HUB_PORT": str(self.port),
                "HUB_PASSWORD": ADMIN_PW, "HUB_SKIP_CHECK": "1", "HUB_CLIENT_BIN": str(FAKE_CLIENT), "HUB_ACCOUNTS_ROOT": str(self.data / "acc"),
-               "CLAUDE_BIN": str(FAKE_CLAUDE), "CLAUDE_FAKE_DIR": str(self.tmp), "TZ": "UTC", "PYTHONDONTWRITEBYTECODE": "1"}
+               "CLAUDE_BIN": str(FAKE_CLAUDE), "CLAUDE_FAKE_DIR": str(self.tmp), "TZ": "UTC", "PYTHONDONTWRITEBYTECODE": "1", **self.extra_env}
         self.log = open(self.tmp / "hub.out", "wb")
         self.proc = subprocess.Popen([sys.executable, str(self.hub_py)], env=env, stdout=self.log, stderr=subprocess.STDOUT, cwd=str(self.tmp))
         end = time.time() + 25
@@ -164,3 +165,25 @@ class TestHub:
 
     def admin(self):
         h = Http(self.base); st, _ = h.login("admin", ADMIN_PW); assert st == 200, st; return h
+
+
+def raw_http(port, data, timeout=6, read=65536):
+    """Envoie des octets bruts au hub (requêtes malformées) -> (réponse en octets ou None si rien reçu avant le délai, durée)."""
+    import time as _t
+    t0 = _t.time()
+    with socket.create_connection(("127.0.0.1", port), timeout=timeout) as s:
+        reset = False
+        try:
+            s.sendall(data)
+        except (ConnectionResetError, BrokenPipeError):
+            reset = True                         # le hub a refusé d'emblée et coupé pendant l'envoi : réponse valable pour un corps trop grand
+        s.settimeout(timeout)
+        try:
+            out = s.recv(read)
+        except (ConnectionResetError, BrokenPipeError):
+            out = b"RESET"
+        except (socket.timeout, TimeoutError):
+            out = None
+        if reset and not out:
+            out = b"RESET"
+    return out, _t.time() - t0

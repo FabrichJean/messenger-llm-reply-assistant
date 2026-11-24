@@ -43,7 +43,13 @@ def ext_import(code, cookies, ip):
     now = time.time()
     with L:
         fl = [t for t in EXT_FAILS.get(ip, []) if now - t < 600]
-        EXT_FAILS[ip] = fl
+        if fl:
+            EXT_FAILS[ip] = fl
+        else:
+            EXT_FAILS.pop(ip, None)
+        if len(EXT_FAILS) > 5000:
+            for k in sorted(EXT_FAILS, key=lambda a: EXT_FAILS[a][-1])[:len(EXT_FAILS) - 5000]:
+                del EXT_FAILS[k]
         if len(fl) >= 10:
             return {"error": "trop d'essais : réessaie dans quelques minutes"}
     h = hashlib.sha256(str(code or "")[:200].encode()).hexdigest()
@@ -74,7 +80,11 @@ def ext_zip(origin):
     cookie_url = os.environ.get("HUB_EXT_COOKIE_URL", "https://www.messenger.com")
     cu = urlparse(cookie_url)
     cookie_host = "https://*.messenger.com/*" if (cu.hostname or "").endswith("messenger.com") else f"{cu.scheme}://{cu.hostname}/*"
-    manifest = (EXT_DIR / "manifest.template.json").read_text().replace("__COOKIE_HOST__", cookie_host).replace("__HUB_ORIGIN__", origin)
+    if not re.fullmatch(r"https?://(\[[0-9a-f:.]+\]|[a-z0-9][a-z0-9.-]{0,251})(:[0-9]{1,5})?", str(origin)):
+        raise ValueError("adresse du hub invalide")          # jamais de texte du client dans le manifeste
+    def fill(v):
+        return v.replace("__COOKIE_HOST__", cookie_host).replace("__HUB_ORIGIN__", origin) if isinstance(v, str) else [fill(x) for x in v] if isinstance(v, list) else {k: fill(x) for k, x in v.items()} if isinstance(v, dict) else v
+    manifest = json.dumps(fill(json.loads((EXT_DIR / "manifest.template.json").read_text())), indent=2)     # structure JSON : aucune injection de clé possible
     cfg = "const CFG = " + json.dumps({"hub": origin, "loginUrl": login_url, "cookieUrl": cookie_url}) + ";\n"
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:

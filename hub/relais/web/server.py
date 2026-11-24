@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import ipaddress
 import json
 import re
 import sqlite3
@@ -105,16 +106,25 @@ class Handler(BaseHTTPRequestHandler):
                 BaseHTTPRequestHandler.send_header(self, k, v)
         super().end_headers()
 
+    HOST_RE = re.compile(r"^(\[[0-9a-f:.]+\]|[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?)(?::([0-9]{1,5}))?$")
+
     def _ok_host(self):
-        h = self.headers.get("Host", "").lower().strip()
-        host = h.split("]")[0] + "]" if h.startswith("[") else h.split(":")[0]
-        return host in ALLOWED_HOSTS
+        """Hôte attendu ET bien formé (nom ou adresse, port numérique) : la valeur est reprise telle quelle dans le paquet de l'extension."""
+        m = self.HOST_RE.match(self.headers.get("Host", "").lower().strip())
+        if not m or (m.group(2) and int(m.group(2)) > 65535):
+            return False
+        return m.group(1) in ALLOWED_HOSTS
 
     def _ip(self):
+        """Adresse du client. Derrière un proxy de confiance : la DERNIÈRE entrée de X-Forwarded-For (celle que le proxy ajoute).
+        Le début de l'en-tête est écrit par le client : le prendre permettrait d'usurper n'importe quelle adresse et de contourner le blocage des essais."""
         if TRUST_PROXY:
             xf = self.headers.get("X-Forwarded-For", "")
             if xf:
-                return xf.split(",")[0].strip()
+                try:
+                    return str(ipaddress.ip_address(xf.split(",")[-1].strip()))
+                except ValueError:
+                    pass        # valeur qui n'est pas une adresse : on retombe sur l'adresse de la connexion
         return self.client_address[0]
 
     def _token(self):
@@ -303,14 +313,64 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._json({"error": "introuvable"}, 404)
 
+    MAX_BODY = 2_000_000
+    PRE_AUTH = {"/api/login": 65_536, "/api/join": 65_536, "/api/accounts/import_ext": 65_536}   # routes sans session : corps minuscule
+    BODY_DEADLINE = 20           # secondes pour recevoir tout le corps (un client qui goutte à goutte ne retient pas un fil indéfiniment)
+
+    def _refuse(self, msg, code):
+        self.close_connection = True
+        self._json({"error": msg}, code)
+
+    def _body_length(self, limit):
+        """Longueur annoncée du corps, validée AVANT toute lecture ; None si une erreur a déjà été renvoyée."""
+        if self.headers.get("Transfer-Encoding"):
+            return self._refuse("encodage de transfert non pris en charge", 400)
+        raw = (self.headers.get("Content-Length") or "0").strip()
+        if not (raw.isascii() and raw.isdigit()) or len(raw) > 10:
+            return self._refuse("requête invalide", 400)
+        n = int(raw)
+        if n > limit:
+            return self._refuse("corps de requête trop grand", 413)
+        return n
+
+    def _read_body(self, n):
+        """Lit exactement n octets, au plus BODY_DEADLINE secondes au total. None (déjà répondu) si le client est trop lent ou coupe."""
+        end = time.monotonic() + self.BODY_DEADLINE
+        chunks, left = [], n
+        while left > 0:
+            if time.monotonic() > end:
+                return self._refuse("corps de requête trop lent", 408)
+            part = self.rfile.read(min(left, 65_536))
+            if not part:
+                return self._refuse("corps de requête incomplet", 400)
+            chunks.append(part)
+            left -= len(part)
+        return b"".join(chunks)
+
+    def _drain(self, n):
+        """Vide un petit corps non lu avant de répondre (sinon la fermeture de la connexion peut effacer la réponse chez le client)."""
+        try:
+            if 0 < n <= 65_536:
+                self.rfile.read(n)
+        except OSError:
+            pass
+
     def do_POST(self):
         # protection CSRF : en-tête personnalisé (interdit en cross-origin sans préflight) + hôte local
         if not self._ok_host() or self.headers.get("X-Hub") != "1":
-            return self._json({"error": "refusé"}, 403)
+            return self._refuse("refusé", 403)
         path = urlparse(self.path).path
         try:
-            n = min(int(self.headers.get("Content-Length", "0")), 2_000_000)
-            body = json.loads(self.rfile.read(n) or b"{}")
+            n = self._body_length(self.PRE_AUTH.get(path, self.MAX_BODY))
+            if n is None:
+                return
+            if path not in self.PRE_AUTH and not self._authed():          # sans session : on ne lit même pas le corps
+                self._drain(n)
+                return self._json({"error": "authentification requise"}, 401)
+            raw = self._read_body(n)
+            if raw is None:
+                return
+            body = json.loads(raw or b"{}")
             if path == "/api/login":
                 if not AUTH.enabled:
                     return self._json({"error": "authentification non activée"}, 400)
