@@ -4,3 +4,9 @@
   "version": "1.0",
   "description": "Connecte ton compte Messenger à ton hub Relais en un clic, avec TON navigateur. Ne lit que les cookies de session de Messenger, uniquement quand tu le demandes depuis ton hub.",
   "permissions": ["cookies", "storage", "alarms"],
+  "host_permissions": ["__COOKIE_HOST__", "__HUB_ORIGIN__/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    { "matches": ["__HUB_ORIGIN__/*"], "js": ["content.js"], "run_at": "document_start" }
+  ]
+}
