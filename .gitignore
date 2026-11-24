@@ -1,0 +1,99 @@
+# ─────────────────────────────────────────────────────────────
+#  Relais / messenger-lite — .gitignore
+#  Règle d'or : rien de ce qui contient une session Messenger,
+#  une clé, un mot de passe ou une conversation n'entre dans git.
+# ─────────────────────────────────────────────────────────────
+
+# ── Secrets et sessions Messenger (NE JAMAIS COMMITER) ──
+cookies.json
+history_device.json*
+e2ee.db*
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+/accounts/
+.backup-avant-migration/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ── Variables d'environnement et mots de passe ──
+.env
+.env.*
+!.env.example
+!*.env.example
+deploy/.env
+initial-passwords.txt
+**/initial-passwords.txt
+
+# ── Données d'exécution du hub (utilisateurs, sessions, conversations) ──
+hub/.lpkey
+hub/accounts.json
+hub/users.json
+hub/sessions.json
+hub/invites.json
+hub/agent.json
+hub/hub.db*
+hub/avatars/
+hub/linkcache/
+hub/sandbox/
+hub/*.out
+hub/*.err
+hub/*.tmp
+
+# ── Signature Android (le coffre est hors du dépôt : ~/.relais-signing) ──
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+local.properties
+
+# ── Binaires et artefacts de build ──
+/messenger-lite
+*.apk
+*.aab
+*.exe
+*.test
+*.out
+mobile/.gradle/
+mobile/build/
+mobile/app/build/
+mobile/captures/
+.gradle/
+build/
+# Le Dockerfile copie dist/relais.apk : à reconstruire (mobile/) ou à fournir avant « docker compose build ».
+relais-connect.zip
+
+# ── Journaux ──
+*.log
+logs/
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# ── Sauvegardes et temporaires ──
+*.bak
+*.orig
+*.rej
+*.swp
+*.tmp
+*.enc
+*.tar.gz
+*.tar.gz.*
+backup-*/
+
+# ── Éditeurs et système ──
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+# ── Notes locales (docs/pass : ne pas versionner) ──
+docs/
