@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="relais_bg">#08080A</color>
+    <color name="relais_accent">#F26A1B</color>
+    <style name="Theme.Relais" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash_bg</item>
+        <item name="android:statusBarColor">@color/relais_bg</item>
+        <item name="android:navigationBarColor">@color/relais_bg</item>
+        <item name="android:windowSplashScreenBackground">@color/relais_bg</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+    </style>
+</resources>

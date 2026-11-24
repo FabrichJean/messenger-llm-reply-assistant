@@ -1,0 +1,51 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Adresse du hub ouvert par l'application : ./gradlew assembleRelease -PhubUrl=https://autre.exemple.fr
+def hubUrl = (project.findProperty('hubUrl') ?: 'https://relay.fabrich.site').toString()
+// réservés aux tests (émulateur + faux site de connexion) ; les valeurs par défaut sont celles de la production
+def loginUrl = (project.findProperty('loginUrl') ?: 'https://www.messenger.com/').toString()
+def loginCookieUrl = (project.findProperty('loginCookieUrl') ?: 'https://www.messenger.com').toString()
+def loginExtraHost = (project.findProperty('loginExtraHost') ?: '').toString()
+def ksFile = project.findProperty('relaisKeystore')
+def ksPass = project.findProperty('relaisKeystorePassword')
+
+android {
+    namespace 'site.fabrich.relais'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'site.fabrich.relais'
+        minSdk 26
+        targetSdk 35
+        versionCode 7
+        versionName '2.5'
+        buildConfigField 'String', 'HUB_URL', "\"${hubUrl}\""
+        buildConfigField 'String', 'LOGIN_URL', "\"${loginUrl}\""
+        buildConfigField 'String', 'LOGIN_COOKIE_URL', "\"${loginCookieUrl}\""
+        buildConfigField 'String', 'LOGIN_EXTRA_HOST', "\"${loginExtraHost}\""
+    }
+    buildFeatures { buildConfig true }
+    signingConfigs {
+        release {
+            if (ksFile && ksPass) {
+                storeFile file(ksFile)
+                storePassword ksPass
+                keyAlias 'relais'
+                keyPassword ksPass
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (ksFile && ksPass) signingConfig signingConfigs.release
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint { abortOnError false }
+}
