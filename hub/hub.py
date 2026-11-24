@@ -1096,3 +1096,277 @@ def serve_media(handler, aid, preview, download):
     if m and (m.group(1) or m.group(2)) and size:
         if m.group(1):
             start = int(m.group(1))
+            end = min(int(m.group(2)), size - 1) if m.group(2) else size - 1
+        else:
+            start = max(0, size - int(m.group(2)))
+        if start > end or start >= size:
+            handler.send_response(416)
+            handler.send_header("Content-Range", f"bytes */{size}")
+            handler.end_headers()
+            return
+        code = 206
+    handler.send_response(code)
+    handler.send_header("Content-Type", ctype if inline else "application/octet-stream")
+    handler.send_header("Content-Length", str(end - start + 1 if size else 0))
+    handler.send_header("Accept-Ranges", "bytes")
+    if code == 206:
+        handler.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+    fname = media.safe_name(a["name"], "fichier")
+    handler.send_header("Content-Disposition", f"{'inline' if inline else 'attachment'}; filename*=UTF-8''{quote(fname)}")
+    handler.send_header("X-Content-Type-Options", "nosniff")
+    handler.send_header("Content-Security-Policy", "default-src 'none'; sandbox")
+    handler.send_header("Cross-Origin-Resource-Policy", "same-origin")
+    handler.send_header("Cache-Control", "private, max-age=3600")
+    handler.end_headers()
+    if size:
+        with open(path, "rb") as fh:
+            fh.seek(start)
+            left = end - start + 1
+            while left > 0:
+                chunk = fh.read(min(65536, left))
+                if not chunk:
+                    break
+                try:
+                    handler.wfile.write(chunk)
+                except (BrokenPipeError, ConnectionResetError):
+                    return
+                left -= len(chunk)
+
+
+# ---------------------------------------------------------------- aperçus de liens
+LP_SEM = threading.Semaphore(2)
+LP_BUSY = set()
+LP_CAP = 200 * media.MB
+
+
+def _lp_key():
+    f = DATA / ".lpkey"
+    try:
+        return f.read_bytes()
+    except OSError:
+        k = os.urandom(32)
+        fd = os.open(f, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(k)
+        return k
+
+
+LP_KEY = _lp_key()
+
+
+def lp_hash(url):
+    """Identifiant d'aperçu = HMAC secret de l'adresse : impossible à deviner même en connaissant le lien (capacité non devinable)."""
+    return hmac.new(LP_KEY, url.encode(), hashlib.sha256).hexdigest()[:24]
+
+
+def lp_dir():
+    d = DATA / "linkcache"
+    d.mkdir(mode=0o700, exist_ok=True)
+    return d
+
+
+FB_HOSTS = ("facebook.com", "fb.com", "fb.watch", "messenger.com")
+
+
+def is_fb(url):
+    h = (urlparse(url).hostname or "").lower()
+    return any(h == d or h.endswith("." + d) for d in FB_HOSTS)
+
+
+def fb_cookie(account):
+    """Cookie de session du compte (pour que Facebook montre le contenu d'un lien comme à ton navigateur). Jamais journalisé ni renvoyé à l'interface."""
+    a = ACCOUNTS.get(account)
+    if not a:
+        return ""
+    try:
+        ck = json.loads((Path(a.dir) / "cookies.json").read_text())
+    except (OSError, ValueError):
+        return ""
+    return "; ".join(f"{k}={ck[k]}" for k in ("c_user", "xs", "datr", "sb", "fr") if ck.get(k) and re.fullmatch(r"[A-Za-z0-9%._:/+=-]+", str(ck[k])))
+
+
+def lp_request(url, account=None):
+    """Lance (une seule fois) la récupération de l'aperçu d'un lien. Rien n'est téléchargé tant que la conversation n'est pas ouverte."""
+    h = lp_hash(url)
+    row = q("SELECT status,ts,auth FROM link_previews WHERE h=?", (h,))
+    use_fb = bool(account and is_fb(url) and setting("link_preview_fb", account) == "1" and fb_cookie(account))
+    if h in LP_BUSY:
+        return
+    if row and (row[0]["status"] == "ok" or (NOW() - row[0]["ts"] < 6 * 3600_000 and not (use_fb and not row[0]["auth"]))):
+        return
+    LP_BUSY.add(h)
+    threading.Thread(target=_lp_fetch, args=(url, h, account if use_fb else None), daemon=True).start()
+
+
+def _lp_fetch(url, h, account=None):
+    info, has_img, status = {"title": "", "descr": "", "site": "", "image": ""}, 0, "none"
+    try:
+        with LP_SEM:
+            ck = fb_cookie(account) if account else ""
+            raw, ctype, final, hdr = media.fetch_public(url, 512 * 1024, timeout=10, ctx=SSL_CTX, accept="text/html,application/xhtml+xml;q=0.9,*/*;q=0.5",
+                                                        cookie=ck, cookie_hosts=FB_HOSTS)
+            if ctype in ("text/html", "application/xhtml+xml", ""):
+                info = media.parse_preview(raw, hdr, final)
+                if info.get("wall"):
+                    info = {"title": "", "descr": "", "site": "", "image": ""}
+                if info["image"]:
+                    try:
+                        data, _ct, _f, _h = media.fetch_public(info["image"], 3 * media.MB, timeout=10, ctx=SSL_CTX, accept="image/*")   # image : jamais de cookie
+                        if media.sniff(data, "") in ("image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"):
+                            fd = os.open(lp_dir() / h, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                            with os.fdopen(fd, "wb") as fh:
+                                fh.write(data)
+                            has_img = 1
+                    except Exception:
+                        pass
+                if info["title"] or info["descr"] or has_img:
+                    status = "ok"
+            media.evict(lp_dir(), LP_CAP)
+    except Exception as ex:
+        log("debug", f"Aperçu de lien indisponible : {str(ex)[:80]}")
+    finally:
+        x("INSERT OR REPLACE INTO link_previews(h,url,status,title,descr,site,image,ts,auth) VALUES(?,?,?,?,?,?,?,?,?)",
+          (h, url, status, info["title"], info["descr"], info["site"], has_img, NOW(), 1 if account else 0))
+        LP_BUSY.discard(h)
+
+
+def link_cards(key, msgs):
+    """Cartes d'aperçu pour les liens écrits dans les messages (quand Messenger n'en a pas fourni)."""
+    acct = acct_of(key)
+    if setting("link_preview", acct) != "1":
+        return
+    enrich_links(key, msgs)
+    fresh = 0
+    for m in msgs[-60:]:
+        if m.get("deleted") or not m.get("text"):
+            continue
+        if any(a["kind"] == "link" for a in m.get("atts") or []):
+            continue
+        for u in media.urls_in(m["text"]):
+            h = lp_hash(u)
+            row = q("SELECT status,title,descr,site,image FROM link_previews WHERE h=?", (h,))
+            if (not row or (row[0]["status"] != "ok" and is_fb(u))) and fresh < 6:
+                lp_request(u, acct)
+                fresh += 1
+            r = row[0] if row else None
+            host = (urlparse(u).hostname or "").removeprefix("www.")
+            m.setdefault("atts", []).append({
+                "id": "lp" + h, "kind": "link", "name": "", "mime": "", "size": 0, "w": 0, "h": 0, "dur": 0, "action": u,
+                "title": (r["title"] if r else "") or "", "subtitle": "", "descr": (r["descr"] if r else "") or "",
+                "site": ((r["site"] if r else "") or host), "has_main": False, "has_preview": False,
+                "img": ("/linkimg/" + h) if r and r["image"] else "", "pending": not row})
+
+
+def enrich_links(key, msgs):
+    """Messenger fournit parfois une carte de lien vide (adresse seule) : on la complète avec l'aperçu de la page."""
+    fresh = 0
+    for m in msgs[-60:]:
+        for a in m.get("atts") or []:
+            if a["kind"] != "link" or a["id"].startswith("lp") or a["title"] or a["has_preview"] or not a["action"] or not media.web_url(a["action"]):
+                continue
+            h = lp_hash(a["action"])
+            row = q("SELECT status,title,descr,site,image FROM link_previews WHERE h=?", (h,))
+            if (not row or (row[0]["status"] != "ok" and is_fb(a["action"]))) and fresh < 6:
+                lp_request(a["action"], acct_of(key))
+                fresh += 1
+            if row and row[0]["status"] == "ok":
+                r = row[0]
+                a.update(title=r["title"] or "", descr=a["descr"] or r["descr"] or "", site=a["site"] or r["site"] or "", img=("/linkimg/" + h) if r["image"] else "")
+            elif not row:
+                a["pending"] = True
+
+
+def serve_linkimg(handler, h):
+    if not re.fullmatch(r"[0-9a-f]{24}", h or ""):
+        return handler._json({"error": "introuvable"}, 404)
+    f = lp_dir() / h
+    try:
+        data = f.read_bytes()
+    except OSError:
+        return handler._json({"error": "introuvable"}, 404)
+    ctype = media.sniff(data[:32], "")
+    if ctype not in ("image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"):
+        return handler._json({"error": "introuvable"}, 404)
+    handler.send_response(200)
+    handler.send_header("Content-Type", ctype)
+    handler.send_header("Content-Length", str(len(data)))
+    handler.send_header("X-Content-Type-Options", "nosniff")
+    handler.send_header("Content-Security-Policy", "default-src 'none'; sandbox")
+    handler.send_header("Cross-Origin-Resource-Policy", "same-origin")
+    handler.send_header("Cache-Control", "private, max-age=86400")
+    handler.end_headers()
+    handler.wfile.write(data)
+
+
+def attach_list(key, msgs):
+    ids = [m["id"] for m in msgs]
+    if not ids:
+        return
+    rows = q(f"SELECT id,msg_id,idx,kind,name,mime,size,w,h,dur,action,title,subtitle,descr,site,source,blob,url,preview "
+             f"FROM attachments WHERE chat_key=? AND msg_id IN ({','.join('?' * len(ids))}) ORDER BY idx", (key, *ids))
+    by = {}
+    for r in rows:
+        by.setdefault(r["msg_id"], []).append({
+            "id": r["id"], "kind": r["kind"], "name": r["name"], "mime": r["mime"], "size": r["size"], "w": r["w"], "h": r["h"], "dur": r["dur"],
+            "action": r["action"], "title": r["title"], "subtitle": r["subtitle"], "descr": r["descr"], "site": r["site"],
+            "has_main": bool(r["url"] or r["preview"] or r["blob"]), "has_preview": bool(r["preview"] or (r["source"] == "e2ee" and r["blob"]))})
+    for m in msgs:
+        m["atts"] = by.get(m["id"], []) if not m.get("deleted") else []
+    link_cards(key, msgs)
+
+
+def process_message(acct, e):
+    thread = int(e.get("thread") or 0)
+    if not thread:
+        return
+    key = f"{acct.name}:{thread}"
+    text = (e.get("text") or "").strip()
+    ts = int(e.get("ts") or NOW())
+    from_me = bool(e.get("from_me"))
+    history = bool(e.get("history"))
+    # écho d'un message que nous venons d'envoyer nous-mêmes
+    if from_me:
+        for (tx, tts) in llm_sent.get(key, []):
+            if tx.strip() == text and abs(NOW() - tts) < 120_000:
+                return
+    if from_me and text and e.get("id"):
+        twin = q("SELECT id FROM messages WHERE chat_key=? AND (id LIKE 'llm-%' OR id LIKE 'owner-%') AND TRIM(text)=? "
+                 "AND ABS(ts-?)<900000 LIMIT 1", (key, text, ts))
+        if twin:  # c'est l'écho d'un message envoyé par nous (LLM ou toi via l'app) : on garde une seule ligne, avec le vrai identifiant
+            try:
+                x("UPDATE messages SET id=? WHERE chat_key=? AND id=?", (e["id"], key, twin[0]["id"]))
+            except sqlite3.IntegrityError:
+                pass
+            return
+    ensure_chat(acct, key, thread)
+    # groupes : e2ee hors serveur msgr, ou classique avec un expéditeur différent du fil
+    jid = e.get("chat") or ""
+    sender = int(e.get("sender") or 0)
+    is_group = (bool(jid) and not jid.endswith("@msgr")) or (not e.get("e2ee") and not from_me and sender and sender != thread)
+    if is_group:
+        x("UPDATE chats SET is_group=1, enabled=0 WHERE key=?", (key,))
+    shown = text or ATT_PLACEHOLDER
+    if not text and e.get("id"):   # la pièce jointe peut être arrivée avant le message : on utilise son étiquette
+        ar = q("SELECT kind FROM attachments WHERE chat_key=? AND msg_id=? ORDER BY idx LIMIT 1", (key, e["id"]))
+        if ar:
+            shown = ATT_LABEL.get(ar[0]["kind"], ATT_PLACEHOLDER)
+    cur = x("INSERT OR IGNORE INTO messages(id,chat_key,ts,sender,text,src) VALUES(?,?,?,?,?,?)",
+            (e.get("id") or f"x{ts}{random.random()}", key, ts, str(sender), shown, "owner" if from_me else "contact"))
+    if cur.rowcount == 0:
+        return  # doublon
+    if not text and e.get("id") and not history:   # message sans texte : sa pièce jointe devrait arriver aussitôt ; sinon on le dit (type non reconnu)
+        def _check_att(k=key, mid=e["id"]):
+            if not q("SELECT 1 FROM attachments WHERE chat_key=? AND msg_id=? LIMIT 1", (k, mid)):
+                log("warn", "Message sans texte et sans pièce jointe reconnue (type non géré ?)", k)
+        threading.Timer(4, _check_att).start()
+    x("UPDATE chats SET last_ts=MAX(last_ts,?), last_text=CASE WHEN ?>=last_ts THEN ? ELSE last_text END WHERE key=?",
+      (ts, ts, shown, key))
+    if from_me:
+        owner_last[key] = max(owner_last.get(key, 0), ts)
+        cancel_timer(key)  # le propriétaire a repris la main
+        maybe_auto_style(acct.name)
+        return
+    late_ok = False
+    if history and text:
+        c0 = q("SELECT * FROM chats WHERE key=?", (key,))[0]
+        max_age = int(setting("late_reply_min", acct.name) or 0) * 60_000
