@@ -25,3 +25,30 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+
+  caddy:
+    image: caddy:2
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on: [hub]
+    environment:
+      DOMAIN: ${DOMAIN:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  hub-data:
+  hub-home:
+  caddy-data:
+  caddy-config:
