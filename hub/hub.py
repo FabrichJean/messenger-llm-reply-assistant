@@ -821,3 +821,278 @@ def handle_event(acct, e):
           "name=excluded.name, pic=CASE WHEN excluded.pic<>'' THEN excluded.pic ELSE contacts.pic END",
           (acct.name, e["id"], e["name"], pic))
         ckey = f"{acct.name}:{e['id']}"
+        ensure_chat(acct, ckey, int(e["id"]), e["name"])  # chaque contact est cherchable, même sans message
+        x("UPDATE chats SET name=? WHERE key=?", (e["name"], ckey))
+        if pic:
+            x("UPDATE chats SET pic=? WHERE key=?", (pic, f"{acct.name}:{e['id']}"))
+    elif t == "thread":
+        key = f"{acct.name}:{e['id']}"
+        if not e.get("id"):
+            return
+        ensure_chat(acct, key, int(e["id"]), e.get("name"))
+        kind = int(e.get("kind") or 0)
+        if kind:
+            x("UPDATE chats SET kind=? WHERE key=?", (kind, key))
+            if kind not in ONE_TO_ONE_KINDS:
+                x("UPDATE chats SET is_group=1, enabled=0 WHERE key=?", (key,))
+            elif kind == 15:  # 1:1 chiffré : on répond par le canal chiffré
+                x("UPDATE chats SET route='e2ee', jid=? WHERE key=? AND (jid='' OR jid IS NULL)", (f"{e['id']}@msgr", key))
+        if e.get("name"):
+            x("UPDATE chats SET name=? WHERE key=? AND (name='' OR name IS NULL)", (e["name"], key))
+        if e.get("pic"):
+            x("UPDATE chats SET pic=? WHERE key=?", (e["pic"], key))
+        if e.get("ts"):
+            x("UPDATE chats SET last_ts=MAX(last_ts,?) WHERE key=?", (int(e["ts"]), key))
+    elif t == "edit":
+        apply_edit(acct, e)
+    elif t == "delete":
+        apply_delete(acct, e)
+    elif t == "debug" and HUB_DEBUG:
+        # noms de champs seulement (jamais de contenu) : sert à comprendre ce que Facebook envoie
+        with open(DATA / "events.log", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"t": time.strftime("%H:%M:%S"), "event": e.get("event"), "fields": e.get("fields")}, ensure_ascii=False) + "\n")
+    elif t == "message":
+        process_message(acct, e)
+    elif t == "attachment":
+        store_attachment(acct, e)
+    elif t == "diag":   # structure reçue pour un message sans pièce jointe reconnue (noms de tables et indicateurs, jamais de contenu)
+        log("info", f"[{acct.name}] diagnostic pièce jointe : lignes={json.dumps(e.get('rows'), ensure_ascii=False)}"[:1500])
+    elif t == "media_ready":
+        w = media_waiters.get((acct.name, str(e.get("req"))))
+        if w:
+            w.update(file=e.get("file"), size=int(e.get("size") or 0), err=e.get("error"))
+            w["ev"].set()
+    elif t == "history":
+        acct.state["history"] = e.get("state")
+        acct.state["history_err"] = e.get("error") or ""
+        acct.state["history_attempts"] = e.get("attempts_remaining")
+        if e.get("state") == "enrolled":
+            log("info", f"[{acct.name}] historique chiffré : accès restauré")
+        elif e.get("state") == "error":
+            log("warn", f"[{acct.name}] historique chiffré : {e.get('error')}"
+                        + (f" ({e.get('attempts_remaining')} essai(s) restant(s))" if e.get("attempts_remaining") is not None else ""))
+    elif t == "history_fetched":
+        w = fetch_waiters.get((acct.name, "h" + str(e.get("chat"))))
+        if w:
+            w.update(count=int(e.get("count") or 0), err=e.get("error"), next=int(e.get("next") or 0), has_more=bool(e.get("has_more")))
+            w["ev"].set()
+    elif t == "threads_done":
+        log("info", f"[{acct.name}] liste des conversations complétée ({e.get('pages')} page(s) de plus)")
+        run_bg("names", resolve_names)
+    elif t == "contact_done":
+        w = fetch_waiters.get((acct.name, "c" + str(e.get("id"))))
+        if w:
+            w["found"] = bool(e.get("found"))
+            w["ev"].set()
+    elif t == "fetched":
+        w = fetch_waiters.get((acct.name, int(e.get("thread") or 0)))
+        if w:
+            w["count"] = int(e.get("count") or 0)
+            if w["count"] == 0:
+                log("debug", f"[{acct.name}] import : réponse sans message, champs reçus = {e.get('fields')}")
+            w["err"] = e.get("error")
+            w["ev"].set()
+    elif t == "error":
+        log("error", f"[{acct.name}] {e.get('error')}")
+
+
+def _target_keys(acct, e):
+    """Conversation(s) concernée(s) : par jid/fil si connu, sinon on retrouve le message par son identifiant."""
+    mid = str(e.get("id") or "")
+    if not mid:
+        return []
+    rows = q("SELECT chat_key FROM messages WHERE id=? AND chat_key LIKE ?", (mid, acct.name + ":%"))
+    return [r["chat_key"] for r in rows]
+
+
+def apply_edit(acct, e):
+    text = (e.get("text") or "").strip()
+    if not text:
+        return
+    for key in _target_keys(acct, e):
+        cur = x("UPDATE messages SET text=?, edited=1, local_edit=0, orig_text='' WHERE id=? AND chat_key=? AND text<>?", (text, e["id"], key, text))
+        if cur.rowcount:
+            last = q("SELECT id FROM messages WHERE chat_key=? ORDER BY ts DESC LIMIT 1", (key,))
+            if last and last[0]["id"] == e["id"]:
+                x("UPDATE chats SET last_text=? WHERE key=?", (text, key))
+            log("info", "Message modifié dans Messenger : mis à jour ici", key)
+
+
+def apply_delete(acct, e):
+    for key in _target_keys(acct, e):
+        cur = x("UPDATE messages SET deleted=1 WHERE id=? AND chat_key=? AND deleted=0", (e["id"], key))
+        drop_attachments(acct, key, e["id"])   # un message retiré : ses pièces jointes aussi (fichiers compris)
+        if cur.rowcount:
+            cancel_timer(key)  # inutile de répondre à un message retiré
+            last = q("SELECT id FROM messages WHERE chat_key=? ORDER BY ts DESC LIMIT 1", (key,))
+            if last and last[0]["id"] == e["id"]:
+                x("UPDATE chats SET last_text='🚫 message supprimé' WHERE key=?", (key,))
+            log("info", "Message supprimé dans Messenger : marqué ici", key)
+
+
+# ---------------------------------------------------------------- pièces jointes
+media_waiters = {}   # (compte, nom de fichier) -> {"ev", "file", "size", "err"}
+media_locks = {}     # (id, aperçu ?) -> verrou : un seul téléchargement à la fois par pièce jointe
+media_fail = {}      # (id, aperçu ?) -> horodatage du dernier échec (on ne réessaie pas en boucle)
+MEDIA_SEM = threading.Semaphore(4)
+ATT_PLACEHOLDER = "[pièce jointe / sticker]"
+ATT_LABEL = {"image": "[image]", "gif": "[GIF]", "sticker": "[sticker]", "video": "[vidéo]", "audio": "[message vocal]",
+             "file": "[fichier]", "link": "[lien partagé]", "location": "[position]", "ephemeral": "[média éphémère]"}
+ATT_KINDS = tuple(ATT_LABEL)
+
+
+def att_id(account, thread, msg_id, idx):
+    return hashlib.sha1(f"{account}|{thread}|{msg_id}|{idx}".encode()).hexdigest()[:24]
+
+
+def media_dir(account):
+    a = ACCOUNTS.get(account)
+    if not a:
+        return None
+    d = Path(a.dir) / "media"
+    d.mkdir(mode=0o700, exist_ok=True)
+    return d
+
+
+def store_attachment(acct, e):
+    thread, mid = int(e.get("thread") or 0), str(e.get("id") or "")
+    kind = e.get("kind") if e.get("kind") in ATT_KINDS else "file"
+    if not thread or not mid:
+        return
+    key = f"{acct.name}:{thread}"
+    aid = att_id(acct.name, thread, mid, int(e.get("idx") or 0))
+    f = {
+        "name": media.clean(e.get("name"), 120), "mime": media.clean(e.get("mime"), 80).lower(),
+        "title": media.clean(e.get("title"), 200), "subtitle": media.clean(e.get("subtitle"), 200),
+        "descr": media.clean(e.get("descr"), 400), "site": media.clean(e.get("site"), 80),
+        "url": media.web_url(e.get("url"), 2000), "preview": media.web_url(e.get("preview"), 2000),
+        "action": media.web_url(e.get("action"), 1000),
+        "blob": str(e.get("blob") or "")[:6000] if re.fullmatch(r"[A-Za-z0-9+/=]*", str(e.get("blob") or "")) else "",
+        "mtype": media.clean(e.get("mtype"), 20),
+    }
+    n = {k: max(0, min(int(e.get(k) or 0), 10**12)) for k in ("size", "w", "h", "dur")}
+    src = "e2ee" if e.get("source") == "e2ee" else "classic"
+    x("INSERT INTO attachments(id,account,chat_key,msg_id,idx,kind,name,mime,size,w,h,dur,url,preview,action,title,subtitle,descr,site,blob,mtype,source,ts) "
+      "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
+      + ",".join(f"{c}=CASE WHEN excluded.{c}<>'' THEN excluded.{c} ELSE attachments.{c} END" for c in
+                 ("name", "mime", "url", "preview", "action", "title", "subtitle", "descr", "site", "blob", "mtype"))
+      + ",kind=CASE WHEN excluded.kind<>'file' OR attachments.kind='' THEN excluded.kind ELSE attachments.kind END"
+      + ",size=MAX(attachments.size,excluded.size),w=MAX(attachments.w,excluded.w),h=MAX(attachments.h,excluded.h),dur=MAX(attachments.dur,excluded.dur)",
+      (aid, acct.name, key, mid, int(e.get("idx") or 0), kind, f["name"], f["mime"], n["size"], n["w"], n["h"], n["dur"], f["url"], f["preview"],
+       f["action"], f["title"], f["subtitle"], f["descr"], f["site"], f["blob"], f["mtype"], src, int(e.get("ts") or NOW())))
+    # le texte du message (pour la liste et pour le LLM) : une étiquette neutre, jamais le nom de fichier ni le titre (contenu non fiable)
+    lab = ATT_LABEL[kind]
+    x("UPDATE messages SET text=? WHERE id=? AND chat_key=? AND text=?", (lab, mid, key, ATT_PLACEHOLDER))
+    x("UPDATE chats SET last_text=? WHERE key=? AND last_text=?", (lab, key, ATT_PLACEHOLDER))
+    # images, GIF, stickers et aperçus de liens récents : récupérés tout de suite (les adresses de Meta expirent)
+    if not e.get("history") and kind in ("image", "gif", "sticker", "link") and (f["url"] or f["preview"] or f["blob"]):
+        threading.Thread(target=_prefetch, args=(aid,), daemon=True).start()
+
+
+def _prefetch(aid):
+    try:
+        ensure_media(aid, preview=False)
+    except Exception as ex:
+        log("debug", f"Pièce jointe non préchargée : {ex}")
+
+
+def drop_attachments(acct, key, mid):
+    rows = q("SELECT id FROM attachments WHERE chat_key=? AND msg_id=?", (key, mid))
+    d = media_dir(acct.name)
+    for r in rows:
+        for suffix in ("", "_p"):
+            if d:
+                try:
+                    (d / (r["id"] + suffix)).unlink()
+                except OSError:
+                    pass
+    if rows:
+        x("DELETE FROM attachments WHERE chat_key=? AND msg_id=?", (key, mid))
+
+
+def ensure_media(aid, preview=False):
+    """Chemin du fichier local de la pièce jointe, après l'avoir récupérée si besoin. Lève une exception sinon."""
+    rows = q("SELECT * FROM attachments WHERE id=?", (aid,))
+    if not rows:
+        raise FileNotFoundError("pièce jointe inconnue")
+    a = rows[0]
+    d = media_dir(a["account"])
+    if d is None:
+        raise FileNotFoundError("compte inconnu")
+    name = aid + ("_p" if preview and a["source"] == "classic" and a["preview"] and a["url"] else "")
+    path = d / name
+    if path.exists() and path.stat().st_size > 0:
+        return path
+    fk = (aid, name.endswith("_p"))
+    if NOW() - media_fail.get(fk, 0) < 60_000:
+        raise RuntimeError("indisponible (dernier essai récent)")
+    lock = media_locks.setdefault(fk, threading.Lock())
+    with lock:
+        if path.exists() and path.stat().st_size > 0:
+            return path
+        cap = media.MAX_BYTES.get(a["kind"], 15 * media.MB)
+        try:
+            with MEDIA_SEM:
+                if a["source"] == "e2ee":
+                    if not a["blob"]:
+                        raise RuntimeError("pas de contenu à récupérer")
+                    acct = ACCOUNTS.get(a["account"])
+                    if not acct or not acct.state.get("e2ee"):
+                        raise RuntimeError("canal chiffré non connecté")
+                    if a["size"] and a["size"] > cap:
+                        raise ValueError("fichier trop gros pour l'affichage")
+                    w = {"ev": threading.Event(), "file": None, "err": None}
+                    media_waiters[(a["account"], name)] = w
+                    try:
+                        if not acct.send({"op": "media", "req": name, "blob": a["blob"], "mtype": a["mtype"], "max": cap}):
+                            raise RuntimeError("client indisponible")
+                        if not w["ev"].wait(60):
+                            raise RuntimeError("délai dépassé")
+                        if w["err"]:
+                            raise RuntimeError(str(w["err"])[:120])
+                    finally:
+                        media_waiters.pop((a["account"], name), None)
+                    if not path.exists():
+                        raise RuntimeError("fichier absent")
+                    os.chmod(path, 0o600)
+                else:
+                    url = (a["preview"] if name.endswith("_p") else (a["url"] or a["preview"])) or a["url"]
+                    if not url:
+                        raise RuntimeError("pas d'adresse")
+                    data, ctype = media.fetch(url, cap, ctx=SSL_CTX)
+                    tmp = d / (name + ".part")
+                    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                    with os.fdopen(fd, "wb") as fh:
+                        fh.write(data)
+                    os.replace(tmp, path)
+        except Exception as ex:
+            media_fail[fk] = NOW()
+            log("debug", f"Pièce jointe indisponible ({a['kind']}, {a['source']}) : {str(ex)[:120]}")
+            raise
+        media.evict(d)
+        return path
+
+
+def serve_media(handler, aid, preview, download):
+    if not re.fullmatch(r"[0-9a-f]{24}", aid or ""):
+        return handler._json({"error": "introuvable"}, 404)
+    own = q("SELECT account FROM attachments WHERE id=?", (aid,))
+    if not own or own[0]["account"] not in mine():
+        return handler._json({"error": "introuvable"}, 404)
+    try:
+        path = ensure_media(aid, preview)
+    except Exception:
+        return handler._json({"error": "pièce jointe indisponible"}, 404)
+    a = q("SELECT kind,name,mime FROM attachments WHERE id=?", (aid,))[0]
+    size = path.stat().st_size
+    with open(path, "rb") as fh:
+        head = fh.read(32)
+    ctype, inline = media.serve_type(a["kind"], head, a["mime"])
+    if download or not inline:
+        inline = False
+    rng = handler.headers.get("Range", "")
+    start, end, code = 0, size - 1, 200
+    m = re.fullmatch(r"bytes=(\d*)-(\d*)", rng.strip())
+    if m and (m.group(1) or m.group(2)) and size:
+        if m.group(1):
+            start = int(m.group(1))
