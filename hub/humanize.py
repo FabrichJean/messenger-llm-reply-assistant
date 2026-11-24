@@ -59,3 +59,64 @@ def cut_sentences(text, tw):
     out, n = [], 0
     for p in parts:
         w = words(p)
+        if out and n + w > tw:
+            break
+        out.append(p)
+        n += w
+    r = " ".join(out)
+    lim = int(tw * 1.6)
+    if words(r) > lim:
+        head = " ".join(r.split()[:lim])
+        k = max(head.rfind(","), head.rfind(";"), head.rfind(" - "))
+        if k > len(head) * 0.5:
+            r = head[:k]
+        elif words(r) > tw * 3.5:
+            r = ""
+    return r
+
+
+def limit_emojis(text, keep):
+    """Au plus `keep` emojis dans le message (les suivants sont retirés)."""
+    n = [0]
+
+    def f(m):
+        n[0] += 1
+        return m.group(0) if n[0] <= keep else ""
+    return re.sub(r"[ \t]{2,}", " ", EMO1.sub(f, text or "")).strip()
+
+
+# ---------------------------------------------------------------- tics : mêmes débuts de phrase, même emoji d'un message à l'autre
+_FILLER = re.compile(
+    r"^\s*(?:(?:(?:ha){2,}h?|ahah+h?|hihi+|lol|mdr|ptdr|xd+|oh|ah|eh|bah|ben)\b[\s,!.…:;-]*)*"
+    r"(?:(?:ok(?:ay)?|d['’]accord|oui|ouais|yes|yeah|yep|ya|alright|bien sûr|carrément|exact)\b[\s,!.…:;-]*)?", re.I)
+
+
+def opener(text, n=2):
+    """Les n premiers mots (sans emojis ni ponctuation) : « haha ok 😅 sorry » -> « haha ok »."""
+    return " ".join(norm(text).split()[:n])
+
+
+def repeated_opener(text, previous, n=2):
+    o = opener(text, n)
+    return bool(o) and any(opener(p, n) == o for p in previous[:3])
+
+
+def strip_opener(text):
+    """Retire le « haha ok, » d'ouverture (et l'emoji qui le suit) s'il reste au moins deux mots de fond."""
+    m = _FILLER.match(text or "")
+    if not m or not m.group(0).strip():
+        return text
+    rest = EMO1.sub("", (text or "")[m.end():], count=0).lstrip(" ,;:!.…-\t")
+    lead_emojis = re.match(r"^\s*(?:" + EMO1.pattern + r"\s*)+", (text or "")[m.end():])
+    rest = (text or "")[m.end() + (lead_emojis.end() if lead_emojis else 0):].lstrip(" ,;:!.…-\t")
+    return rest if words(rest) >= 2 else text
+
+
+def drop_repeated_emojis(text, previous):
+    """Retire les emojis déjà utilisés dans les derniers messages (le même emoji partout est un signe d'automate)."""
+    used = set()
+    for p in previous[:3]:
+        used.update(EMO1.findall(p or ""))
+    if not used:
+        return text
+    return re.sub(r"[ \t]{2,}", " ", EMO1.sub(lambda m: "" if m.group(0) in used else m.group(0), text or "")).strip()
