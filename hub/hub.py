@@ -3292,3 +3292,277 @@ class Handler(BaseHTTPRequestHandler):
         return host in ALLOWED_HOSTS
 
     def _ip(self):
+        if TRUST_PROXY:
+            xf = self.headers.get("X-Forwarded-For", "")
+            if xf:
+                return xf.split(",")[0].strip()
+        return self.client_address[0]
+
+    def _token(self):
+        for part in self.headers.get("Cookie", "").split(";"):
+            k, _, v = part.strip().partition("=")
+            if k in ("__Host-hub_session", "hub_session"):
+                return v
+        return ""
+
+    def _authed(self):
+        """Utilisateur de la session ({"name","role"}) ; en usage local sans authentification : l'utilisateur local (admin)."""
+        if not AUTH.enabled:
+            return {"name": "local", "role": "admin"}
+        return AUTH.valid(self._token())
+
+    def _secure(self):
+        return SECURE_COOKIE or (TRUST_PROXY and self.headers.get("X-Forwarded-Proto", "") == "https")
+
+    def _login_page(self):
+        body = (HERE / "login.html").read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Security-Policy", csp_for(body))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _session_ok(self, tok):
+        self.send_response(200)
+        out = json.dumps({"ok": True}).encode()
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(out)))
+        if self._secure():   # préfixe __Host- : le navigateur refuse tout cookie qui ne serait pas Secure, sans Domain et à la racine
+            self.send_header("Set-Cookie", f"__Host-hub_session={tok}; HttpOnly; SameSite=Strict; Path=/; Secure; Max-Age={authmod.SESSION_TTL}")
+        else:
+            self.send_header("Set-Cookie", f"hub_session={tok}; HttpOnly; SameSite=Strict; Path=/; Max-Age={authmod.SESSION_TTL}")
+        self.end_headers()
+        self.wfile.write(out)
+
+    def _page(self, name):
+        body = (HERE / name).read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Security-Policy", csp_for(body))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _json(self, obj, code=200):
+        body = json.dumps(obj, ensure_ascii=False).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if self.path == "/healthz":   # sonde de santé (Docker) : aucune donnée
+            body = b"ok"
+            self.send_response(200)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if not self._ok_host():
+            return self._json({"error": "host refusé"}, 403)
+        u = urlparse(self.path)
+        if u.path == "/join" and AUTH.enabled:   # page d'inscription par invitation (le jeton est dans le fragment « # » : il ne part jamais au serveur ni dans les journaux)
+            return self._page("join.html")
+        user = self._authed()
+        if u.path == "/login":
+            if user and AUTH.enabled:
+                self.send_response(302)
+                self.send_header("Location", "/")
+                self.end_headers()
+                return
+            return self._login_page()
+        if not user:
+            if u.path in ("/", "/index.html"):
+                if "RelaisApp" in self.headers.get("User-Agent", ""):   # l'application Android va directement à la connexion
+                    return self._login_page()
+                body = (HERE / "index.html").read_bytes().replace(b"<body>", b'<body data-public="1">', 1)   # page d'accueil publique : aucune donnée, seulement l'interface statique
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Content-Security-Policy", csp_for(body))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            return self._json({"error": "authentification requise"}, 401)
+        REQ.user = user
+        try:
+            self._route_get(u)
+        finally:
+            REQ.user = None
+
+    def _route_get(self, u):
+        if u.path in ("/", "/index.html"):
+            body = (HERE / "index.html").read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Security-Policy", csp_for(body))
+            self.end_headers()
+            self.wfile.write(body)
+        elif u.path.startswith("/linkimg/"):
+            serve_linkimg(self, u.path[len("/linkimg/"):])
+        elif u.path.startswith("/media/"):
+            qs = parse_qs(u.query)
+            serve_media(self, u.path[len("/media/"):], "p" in qs, "dl" in qs)
+        elif u.path == "/api/state":
+            self._json(api_state())
+        elif u.path == "/api/stats":
+            self._json(api_stats())
+        elif u.path == "/api/avatar":
+            akey = parse_qs(u.query).get("key", [""])[0]
+            data = avatar_bytes(akey) if own_chat(akey) else None
+            if not data:
+                return self._json({"error": "pas de photo"}, 404)
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg" if data[:3] == b"\xff\xd8\xff" else
+                             "image/png" if data[:4] == b"\x89PNG" else "image/webp" if data[8:12] == b"WEBP" else "application/octet-stream")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Cache-Control", "private, max-age=86400")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        elif u.path == "/api/accounts/login/status":
+            info = LOGIN.get(_lkey(cur_name()))
+            self._json({"state": info["state"], "error": info["error"], "name": info["name"], "reused": info["reused"], "remote": info.get("remote", False), "phase": info.get("phase", "")} if info else {"state": "none"})
+        elif u.path == "/relais.apk":
+            f = HERE.parent / "dist" / "relais.apk"
+            try:
+                data = f.read_bytes()
+            except OSError:
+                return self._json({"error": "application indisponible"}, 404)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.android.package-archive")
+            self.send_header("Content-Disposition", 'attachment; filename="Relais.apk"')
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        elif u.path == "/relais-connect.zip":
+            host = self.headers.get("Host", "")
+            data = ext_zip(("https://" if self._secure() else "http://") + host)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Disposition", 'attachment; filename="relais-connect.zip"')
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        elif u.path == "/api/accounts/login/frame":
+            info = LOGIN.get(_lkey(cur_name()))
+            if not info or not info.get("remote"):
+                return self._json({"error": "aucune connexion en cours"}, 404)
+            try:
+                last = int(parse_qs(u.query).get("n", ["0"])[0])
+            except ValueError:
+                last = 0
+            f = info["dir"] / "frame.jpg"
+            for _ in range(25):   # attente d'une image plus récente (≤ 2,5 s) puis 204
+                try:
+                    st = f.stat().st_mtime_ns
+                    if st > last:
+                        data = f.read_bytes()
+                        self.send_response(200)
+                        self.send_header("Content-Type", "image/jpeg")
+                        self.send_header("Content-Length", str(len(data)))
+                        self.send_header("X-N", str(st))
+                        self.end_headers()
+                        self.wfile.write(data)
+                        return
+                except OSError:
+                    pass
+                if info["state"] not in ("starting", "waiting_login"):
+                    break
+                time.sleep(0.1)
+            self.send_response(204)
+            self.send_header("X-N", str(last))
+            self.end_headers()
+        elif u.path == "/api/chat":
+            ckey = parse_qs(u.query).get("key", [""])[0]
+            r = api_chat(ckey) if own_chat(ckey) else None
+            self._json(r if r else {"error": "inconnu"}, 200 if r else 404)
+        else:
+            self._json({"error": "introuvable"}, 404)
+
+    def do_POST(self):
+        # protection CSRF : en-tête personnalisé (interdit en cross-origin sans préflight) + hôte local
+        if not self._ok_host() or self.headers.get("X-Hub") != "1":
+            return self._json({"error": "refusé"}, 403)
+        path = urlparse(self.path).path
+        try:
+            n = min(int(self.headers.get("Content-Length", "0")), 2_000_000)
+            body = json.loads(self.rfile.read(n) or b"{}")
+            if path == "/api/login":
+                if not AUTH.enabled:
+                    return self._json({"error": "authentification non activée"}, 400)
+                try:
+                    tok = AUTH.login(body.get("username"), body.get("password"), self._ip())
+                except PermissionError as ex:
+                    return self._json({"error": str(ex)}, 429)
+                if not tok:
+                    log("warn", f"Échec de connexion au hub (identifiant « {clean(body.get('username'))} », adresse {clean(self._ip(), 45)})")
+                    return self._json({"error": "Identifiant ou mot de passe incorrect."}, 401)
+                log("info", f"Connexion au hub réussie (« {clean(body.get('username'))} », adresse {clean(self._ip(), 45)})")
+                return self._session_ok(tok)
+            if path == "/api/accounts/import_ext":
+                return self._json(ext_import(body.get("code"), body.get("cookies"), self._ip()))
+            if path == "/api/join":
+                if not AUTH.enabled:
+                    return self._json({"error": "authentification non activée"}, 400)
+                name = str(body.get("username") or "").strip().lower()
+                try:
+                    AUTH.redeem_invite(body.get("token"), name, body.get("password"), self._ip())
+                except PermissionError as ex:
+                    return self._json({"error": str(ex)}, 429)
+                except ValueError as ex:
+                    return self._json({"error": str(ex)}, 400)
+                log("info", f"Nouvel utilisateur « {clean(name)} » inscrit par invitation (adresse {clean(self._ip(), 45)})")
+                tok = AUTH.login(name, body.get("password"), self._ip())
+                return self._session_ok(tok) if tok else self._json({"ok": True})
+            user = self._authed()
+            if not user:
+                return self._json({"error": "authentification requise"}, 401)
+            if path == "/api/logout":
+                AUTH.logout(self._token())
+                self.send_response(200)
+                out = b'{"ok": true}'
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(out)))
+                self.send_header("Set-Cookie", "hub_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0")
+                self.send_header("Set-Cookie", "__Host-hub_session=; HttpOnly; SameSite=Strict; Path=/; Secure; Max-Age=0")
+                self.end_headers()
+                self.wfile.write(out)
+                return
+            REQ.user = user
+            try:
+                self._json(post(path, body))
+            finally:
+                REQ.user = None
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError, AttributeError, IndexError, OverflowError, sqlite3.Error):
+            self._json({"error": "requête invalide"}, 400)
+        except Exception as ex:
+            log("error", f"Erreur de requête {path} : {type(ex).__name__}: {str(ex)[:120]}")
+            self._json({"error": "erreur interne"}, 500)
+
+
+def main():
+    dedupe_owner_echoes()
+    for a in ACCOUNTS.values():
+        a.start()
+    threading.Thread(target=autosync_loop, daemon=True, name="autosync").start()
+    if BIND not in ("127.0.0.1", "localhost", "::1") and not AUTH.enabled:
+        sys.exit("REFUS DE DÉMARRER : le hub écouterait sur "+BIND+" sans utilisateur. Définis HUB_PASSWORD pour créer l'administrateur au premier démarrage (ou garde HUB_BIND=127.0.0.1 et passe par un tunnel SSH).")
+    srv = BoundedServer((BIND, PORT), Handler)
+    srv.daemon_threads = True
+    log("info", f"Hub prêt : http://{BIND}:{PORT}  ({f'accès protégé : {len(AUTH.list_users())} utilisateur(s)' if AUTH.enabled else 'local uniquement'} ; LLM actif uniquement pour les contacts que tu actives)")
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        for a in ACCOUNTS.values():
+            a.shutdown()
+
+
+if __name__ == "__main__":
+    main()
