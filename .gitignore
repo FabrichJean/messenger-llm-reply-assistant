@@ -51,6 +51,7 @@ signing.properties
 local.properties
 
 # ── Binaires et artefacts de build ──
+/bin/
 /messenger-lite
 *.apk
 *.aab
@@ -95,5 +96,5 @@ backup-*/
 .vscode/
 *.iml
 
-# ── Notes locales (docs/pass : ne pas versionner) ──
-docs/
+# ── Notes locales : docs/ est versionné, sauf ce fichier personnel ──
+docs/pass

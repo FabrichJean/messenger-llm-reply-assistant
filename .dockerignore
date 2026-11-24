@@ -8,6 +8,10 @@ cookies.json
 *.db-shm
 history_device.json*
 /messenger-lite
+bin
+docs
+tools
+tests
 hub/hub.db*
 hub/sandbox
 hub/*.err

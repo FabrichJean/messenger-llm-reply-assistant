@@ -122,8 +122,7 @@ class Account:
 
 def _fix_cfg(c):
     """Un accounts.json venu d'une autre machine contient des chemins qui n'existent pas ici : on les recalcule."""
-    root = Path(os.environ.get("HUB_ACCOUNTS_ROOT", HERE.parent / "accounts"))
-    cli = os.environ.get("HUB_CLIENT_BIN", str(HERE.parent / "messenger-lite"))
+    root, cli = ACCOUNTS_ROOT, CLIENT_BIN
     c = dict(c)
     if not Path(c["dir"]).exists() and (root / c["name"]).exists():
         c["dir"] = str(root / c["name"])

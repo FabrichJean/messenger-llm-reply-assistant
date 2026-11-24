@@ -58,7 +58,15 @@ ACCOUNT_CFG = json.loads(acc_file.read_text()) if acc_file.exists() else []   # 
 ACCOUNTS_ROOT = Path(os.environ.get("HUB_ACCOUNTS_ROOT", HERE.parent / "accounts"))
 
 
-CLIENT_BIN = os.environ.get("HUB_CLIENT_BIN", str(HERE.parent / "messenger-lite"))
+def _default_client_bin():
+    """Client Go : bin/messenger-lite (go build -o bin/messenger-lite ./cmd/messenger-lite), sinon l'ancien emplacement à la racine."""
+    for p in (HERE.parent / "bin" / "messenger-lite", HERE.parent / "messenger-lite"):
+        if p.exists():
+            return str(p)
+    return str(HERE.parent / "bin" / "messenger-lite")
+
+
+CLIENT_BIN = os.environ.get("HUB_CLIENT_BIN", _default_client_bin())
 
 
 REMOTE_LOGIN = os.environ.get("HUB_LOGIN_REMOTE") == "1"   # serveur sans écran : navigateur distant affiché dans une fenêtre modale du hub
@@ -71,7 +79,7 @@ if REMOTE_LOGIN and not LOGIN_PY.exists():
     LOGIN_PY = Path(sys.executable)
 
 
-LOGIN_SCRIPT = HERE.parent / "login_browser.py"
+LOGIN_SCRIPT = HERE.parent / "tools" / "login_browser.py"
 
 
 LOGIN_ENV_KEEP = ("PATH", "HOME", "TZ", "LANG", "LC_ALL", "PLAYWRIGHT_BROWSERS_PATH", "LOGIN_NO_SANDBOX", "LOGIN_CHANNEL", "LOGIN_TEST_HOST", "DISPLAY", "SSL_CERT_FILE", "SSL_CERT_DIR")

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/hero.jpg" alt="Relais — ta présence, même quand tu es absent" width="100%">
+<img src="docs/images/hero.jpg" alt="Relais — ta présence, même quand tu es absent" width="100%">
 
 <br>
 
@@ -25,7 +25,7 @@ Un client léger en Go (sans navigateur), un hub web multi-utilisateurs, une app
 <br>
 
 <div align="center">
-<img src="assets/collage.jpg" alt="Aperçu des écrans de Relais : hub, statistiques, sécurité, comptes et application mobile" width="100%">
+<img src="docs/images/collage.jpg" alt="Aperçu des écrans de Relais : hub, statistiques, sécurité, comptes et application mobile" width="100%">
 <sub>Captures prises sur une instance de démonstration, avec des contacts et des conversations fictifs.</sub>
 </div>
 
@@ -44,24 +44,24 @@ Relais se connecte à ton compte Messenger, lit les messages entrants et, **dans
 - 🎨 **Interface soignée** : thème sombre ou clair, 8 couleurs d'accent, version web et application Android.
 
 <div align="center">
-<img src="assets/themes.jpg" alt="Le hub en plusieurs couleurs d'accent et en thème clair" width="100%">
+<img src="docs/images/themes.jpg" alt="Le hub en plusieurs couleurs d'accent et en thème clair" width="100%">
 </div>
 
 ## Aperçu
 
 <table>
 <tr>
-<td width="50%"><img src="assets/hub.jpg" alt="Hub : liste des conversations, conversation avec réponses du LLM, contrôle rapide"><br><sub><b>Hub</b> — conversations, réponses du LLM en orange, contrôle rapide.</sub></td>
-<td width="50%"><img src="assets/stats.jpg" alt="Statistiques : activité des 14 derniers jours et consommation du LLM"><br><sub><b>Statistiques</b> — activité, consommation et cache du LLM (comptages seulement, jamais le contenu).</sub></td>
+<td width="50%"><img src="docs/images/hub.jpg" alt="Hub : liste des conversations, conversation avec réponses du LLM, contrôle rapide"><br><sub><b>Hub</b> — conversations, réponses du LLM en orange, contrôle rapide.</sub></td>
+<td width="50%"><img src="docs/images/stats.jpg" alt="Statistiques : activité des 14 derniers jours et consommation du LLM"><br><sub><b>Statistiques</b> — activité, consommation et cache du LLM (comptages seulement, jamais le contenu).</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="assets/security.jpg" alt="Page sécurité : protection active, espace privé, messages suspects"><br><sub><b>Sécurité</b> — protections actives et messages suspects détectés.</sub></td>
-<td width="50%"><img src="assets/accounts.jpg" alt="Fenêtre des comptes Messenger avec téléchargement de l'application Android"><br><sub><b>Comptes Messenger</b> — connexion depuis l'application Android.</sub></td>
+<td width="50%"><img src="docs/images/security.jpg" alt="Page sécurité : protection active, espace privé, messages suspects"><br><sub><b>Sécurité</b> — protections actives et messages suspects détectés.</sub></td>
+<td width="50%"><img src="docs/images/accounts.jpg" alt="Fenêtre des comptes Messenger avec téléchargement de l'application Android"><br><sub><b>Comptes Messenger</b> — connexion depuis l'application Android.</sub></td>
 </tr>
 </table>
 
 <div align="center">
-<img src="assets/mobile.jpg" alt="Version mobile : accueil, conversation, statistiques" width="70%">
+<img src="docs/images/mobile.jpg" alt="Version mobile : accueil, conversation, statistiques" width="70%">
 </div>
 
 ## Comment ça marche
@@ -107,7 +107,7 @@ Le hub n'écoute que sur `127.0.0.1` du serveur : ouvre-le par un tunnel SSH (`s
 ## Développement local
 
 ```bash
-go build -o messenger-lite ./cmd/messenger-lite   # client Messenger (Go, CGO requis pour SQLite)
+go build -o bin/messenger-lite ./cmd/messenger-lite   # client Messenger (Go, CGO requis pour SQLite)
 python3 hub/hub.py                  # hub sur http://127.0.0.1:8787
 go test ./...                       # tests du client
 tests/run.sh                        # tous les tests (client Go + hub de bout en bout)
@@ -144,11 +144,11 @@ La connexion Messenger se fait dans l'application, sur `messenger.com`. Le mot d
 
 ```
 .
-├── cmd/messenger-lite/main.go                     Client Messenger (Go) : point d'entrée
-├── internal/                                      protocol (contrat JSON avec le hub), attachments, e2ee, history
+├── cmd/messenger-lite/main.go       Client Messenger (Go) : point d'entrée
+├── internal/                        protocol (contrat JSON avec le hub), attachments, e2ee, history
 ├── hub/
-│   ├── hub.py                    Lanceur du hub (quelques lignes)
-│   ├── relais/                   Code du hub, en couches
+│   ├── hub.py                       Lanceur du hub (quelques lignes)
+│   ├── relais/                      Code du hub, en couches
 │   │   ├── config.py db.py context.py tls.py        Configuration, base SQLite, contexte de la requête
 │   │   ├── auth.py security.py media.py             Utilisateurs et sessions, défenses, types de médias
 │   │   ├── accounts.py login.py                     Comptes Messenger, connexion (extension, cookies)
@@ -156,14 +156,18 @@ La connexion Messenger se fait dans l'application, sur `messenger.com`. Le mot d
 │   │   ├── sync.py tasks.py                         Synchronisation de l'historique, tâches de fond
 │   │   ├── llm/                                     Prompts, réponses, mémoire, style, humanisation, garde-fous
 │   │   └── web/                                     Serveur HTTP, pages (assemblage de ui/), routes de l'API, utilisateurs
-│   ├── users_cli.py adopt_account.py                Outils en ligne de commande
-│   └── ui/                                          Interface web : index.html (squelette), css/, js/, login.html, join.html
-├── mobile/                                          Application Android (WebView)
-├── extension/                                       Extension « Relais Connect »
-├── deploy/                                          Guide VPS, Caddy, sauvegardes, envoi de comptes
-├── tests/                                           Tests (voir tests/README.md) : `tests/run.sh`
-├── Dockerfile, docker-compose.yml                   Déploiement
-└── MULTIUSER.md                                     Conception multi-utilisateurs
+│   ├── ui/                          Interface web : index.html (squelette), css/, js/, login.html, join.html
+│   └── users_cli.py adopt_account.py                Outils en ligne de commande du hub
+├── mobile/                          Application Android (WebView)
+├── extension/                       Extension de navigateur « Relais Connect »
+├── deploy/                          Guide VPS, Caddy, sauvegardes, envoi de comptes
+├── tools/                           import_cookies.py, login_browser.py, cookies.example.json
+├── tests/                           Tests (voir tests/README.md) : `tests/run.sh`
+├── docs/                            multiuser.md (conception multi-utilisateurs), images/ (illustrations)
+├── Dockerfile, docker-compose.yml   Déploiement
+└── go.mod, go.sum, LICENSE
+
+Données et artefacts locaux (jamais dans git) : `accounts/` (sessions), `bin/` (binaire Go), `dist/` (APK), `.venv/`.
 ```
 
 `main` regroupe tout ; les branches `feature/*` isolent chaque thème (`go-client`, `hub-core`, `hub-auth`, `hub-llm`, `android-app`, `extension`, `deploy`) et `chore/repo-meta` porte la configuration du dépôt.

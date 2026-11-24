@@ -95,7 +95,7 @@ docker compose stop hub && docker compose cp /tmp/hub.db hub:/data/hub.db && doc
 - Conteneur non-root, système de fichiers en lecture seule, aucune capacité Linux, 1,5 Go de mémoire maximum.
 - Secrets (cookies, clés chiffrées) uniquement dans le volume `hub-data`, fichiers en `600`.
 
-Ce qui n'y est **pas** : plusieurs utilisateurs avec droits séparés (voir `MULTIUSER.md`) — un seul mot de passe donne accès à tous les comptes du hub.
+Ce qui n'y est **pas** : plusieurs utilisateurs avec droits séparés (voir [`docs/multiuser.md`](../docs/multiuser.md)) — un seul mot de passe donne accès à tous les comptes du hub.
 
 ## Dépannage
 | Symptôme | Piste |

@@ -17,7 +17,8 @@ label = sys.argv[2] if len(sys.argv) > 2 else ""
 here = Path(__file__).resolve().parent
 data = Path(os.environ.get("HUB_DATA", here))
 root = Path(os.environ.get("HUB_ACCOUNTS_ROOT", here.parent / "accounts"))
-cli = os.environ.get("HUB_CLIENT_BIN", str(here.parent / "messenger-lite"))
+cli = os.environ.get("HUB_CLIENT_BIN") or next((str(p) for p in (here.parent / "bin" / "messenger-lite", here.parent / "messenger-lite") if p.exists()),
+                                                 str(here.parent / "bin" / "messenger-lite"))
 d = root / name
 if not (d / "cookies.json").exists():
     sys.exit(f"Introuvable : {d}/cookies.json")
