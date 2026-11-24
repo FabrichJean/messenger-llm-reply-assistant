@@ -26,3 +26,13 @@ Aucun test n'importe `hub.py` : ils ne dépendent donc pas de l'organisation int
 | `test_pure_modules.py` | `humanize`, `memory`, `security`, `auth` (importés directement, à plat ou dans `relais/`) |
 
 Les données de test sont fictives. Rien n'est écrit en dehors du dossier temporaire.
+
+## Test différentiel (refontes de la couche web)
+
+`tests/tools/diff_routes.py` rejoue 88 requêtes POST (valides et invalides, sur les 34 routes d'écriture) sur **deux versions** du hub et compare le code HTTP, le JSON, l'état de la base après chaque appel et les ordres reçus par le client. L'ancienne version tourne deux fois : une requête dont le résultat varie d'une exécution à l'autre est signalée « instable » et exclue.
+
+```bash
+git worktree add /tmp/hub-avant <commit-avant>
+ln -s "$PWD/.venv" /tmp/hub-avant/.venv          # le hub y cherche l'outil de connexion
+python3 tests/tools/diff_routes.py /tmp/hub-avant "$PWD"
+```

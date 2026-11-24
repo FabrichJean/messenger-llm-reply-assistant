@@ -24,7 +24,7 @@ class Http:
     def __init__(self, base):
         self.base, self.cookie = base, ""
 
-    def req(self, method, path, body=None, headers=None, csrf=True, host=None):
+    def req(self, method, path, body=None, headers=None, csrf=True, host=None, timeout=20):
         h = dict(headers or {})
         data = None
         if body is not None:
@@ -38,7 +38,7 @@ class Http:
             h["Host"] = host
         r = urllib.request.Request(self.base + path, data=data, headers=h, method=method)
         try:
-            with urllib.request.urlopen(r, timeout=20) as resp:
+            with urllib.request.urlopen(r, timeout=timeout) as resp:
                 status, hd, raw = resp.status, resp.headers, resp.read()
         except urllib.error.HTTPError as e:
             status, hd, raw = e.code, e.headers, e.read()
@@ -60,7 +60,8 @@ class Http:
 
 class TestHub:
     """Un hub jetable. accounts : {nom_compte: propriétaire (ou None)}."""
-    def __init__(self, accounts=None):
+    def __init__(self, accounts=None, hub_py=None):
+        self.hub_py = Path(hub_py) if hub_py else HUB          # autre version du hub (test différentiel)
         self.tmp = Path(tempfile.mkdtemp(prefix="relais-test-"))
         self.data = self.tmp / "data"; self.data.mkdir()
         self.port = free_port(); self.base = f"http://127.0.0.1:{self.port}"
@@ -78,7 +79,7 @@ class TestHub:
                "HUB_PASSWORD": ADMIN_PW, "HUB_SKIP_CHECK": "1", "HUB_CLIENT_BIN": str(FAKE_CLIENT), "HUB_ACCOUNTS_ROOT": str(self.data / "acc"),
                "CLAUDE_BIN": str(FAKE_CLAUDE), "CLAUDE_FAKE_DIR": str(self.tmp), "TZ": "UTC", "PYTHONDONTWRITEBYTECODE": "1"}
         self.log = open(self.tmp / "hub.out", "wb")
-        self.proc = subprocess.Popen([sys.executable, str(HUB)], env=env, stdout=self.log, stderr=subprocess.STDOUT, cwd=str(self.tmp))
+        self.proc = subprocess.Popen([sys.executable, str(self.hub_py)], env=env, stdout=self.log, stderr=subprocess.STDOUT, cwd=str(self.tmp))
         end = time.time() + 25
         while time.time() < end:
             if self.proc.poll() is not None:
