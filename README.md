@@ -170,8 +170,6 @@ La connexion Messenger se fait dans l'application, sur `messenger.com`. Le mot d
 Données et artefacts locaux (jamais dans git) : `accounts/` (sessions), `bin/` (binaire Go), `dist/` (APK), `.venv/`.
 ```
 
-`main` regroupe tout ; les branches `feature/*` isolent chaque thème (`go-client`, `hub-core`, `hub-auth`, `hub-llm`, `android-app`, `extension`, `deploy`) et `chore/repo-meta` porte la configuration du dépôt.
-
 ## Licence
 
 Distribué sous licence **GNU AGPL-3.0** : voir [`LICENSE`](LICENSE). Le client Go s'appuie sur [`mautrix-meta`](https://github.com/mautrix/meta) (`messagix`), lui aussi sous AGPL-3.0. Si tu proposes Relais comme service en ligne, la licence t'oblige à fournir le code source à tes utilisateurs.
