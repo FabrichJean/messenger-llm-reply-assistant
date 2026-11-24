@@ -169,3 +169,173 @@ public class MessengerLoginActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
                 Uri u = r.getUrl();
+                boolean test = !BuildConfig.LOGIN_EXTRA_HOST.isEmpty() && BuildConfig.LOGIN_EXTRA_HOST.equalsIgnoreCase(u.getHost());   // vide en production
+                return !(("https".equals(u.getScheme()) && isMeta(u.getHost())) || (test && BuildConfig.DEBUG));   // jamais en dehors de Meta, et jamais en clair
+            }
+
+            @Override
+            public void onPageFinished(WebView v, String url) {
+                check();
+                if (sending || finished || retries >= 2) return;
+                v.evaluateJavascript("(document.body&&document.body.innerText||'').slice(0,600)", txt -> {   // page d'erreur de Messenger : on retente une fois l'adresse d'entrée
+                    if (txt == null || sending || finished || retries >= 2) return;
+                    for (String mk : ERROR_MARKERS) if (txt.contains(mk)) { retries++; web.loadUrl(LOGIN_URL); return; }
+                });
+            }
+        });
+        web.loadUrl(LOGIN_URL);
+        ui.postDelayed(poll, 1200);
+    }
+
+    private static boolean isMeta(String h) {
+        if (h == null) return false;
+        h = h.toLowerCase();
+        return h.equals("messenger.com") || h.endsWith(".messenger.com") || h.equals("facebook.com") || h.endsWith(".facebook.com")
+                || h.endsWith(".fbcdn.net") || h.endsWith(".facebook.net") || h.equals("fb.com") || h.endsWith(".fb.com");
+    }
+
+    private final Runnable poll = new Runnable() {
+        @Override
+        public void run() {
+            if (finished || sending) return;
+            check();
+            ui.postDelayed(this, 1200);
+        }
+    };
+
+    /** Pages où Messenger demande encore quelque chose à la personne (connexion, consentement, vérification) : on ne capte pas la session avant leur fin. */
+    private static boolean isStep(String url) {
+        if (url == null) return true;
+        String u = url.toLowerCase();
+        for (String k : new String[]{"/login", "/privacy/consent", "/consent", "/checkpoint", "/two_step", "two_factor", "/recover", "/confirm", "/device-based", "/auth_platform", "/captcha", "/cookie/consent"})
+            if (u.contains(k)) return true;
+        return false;
+    }
+
+    private void check() {
+        if (sending || finished) return;
+        String c = CookieManager.getInstance().getCookie(BuildConfig.LOGIN_COOKIE_URL);
+        if (c == null) c = "";
+        boolean ok = hasCookie(c, "c_user") && hasCookie(c, "xs") && hasCookie(c, "datr");
+        if (ok) {
+            String url = web.getUrl();
+            if (isStep(url) || web.getProgress() < 100) {   // session présente mais Messenger demande encore une étape (ex. consentement)
+                cleanPolls = 0;
+                hint.setText(isStep(url) && url != null && !url.toLowerCase().contains("/login") ? "Termine l'étape demandée par Messenger, puis patiente quelques secondes." : "Connexion en cours…");
+                hint.setVisibility(View.VISIBLE);
+                return;
+            }
+            if (++cleanPolls < 3) return;                    // page normale et stable (~4 s) : la session est vraiment utilisable
+            if (failed) return;                              // refus du hub : on attend « Réessayer » ou une nouvelle étape
+            hint.setVisibility(View.GONE);
+            send(c);
+            return;
+        }
+        // connecté côté facebook.com seulement : on ouvre messenger.com pour y établir la session (au plus toutes les 15 s)
+        String fb = CookieManager.getInstance().getCookie("https://www.facebook.com");
+        if (fb != null && hasCookie(fb, "c_user") && hasCookie(fb, "xs") && System.currentTimeMillis() - lastNudge > 15000) {
+            lastNudge = System.currentTimeMillis();
+            web.loadUrl(LOGIN_URL);
+        }
+    }
+
+    private static boolean hasCookie(String all, String name) {
+        for (String p : all.split(";")) {
+            String t = p.trim();
+            if (t.startsWith(name + "=") && t.length() > name.length() + 1) return true;
+        }
+        return false;
+    }
+
+    private void send(final String cookies) {
+        sending = true;
+        web.setVisibility(View.INVISIBLE);
+        cover.setVisibility(View.VISIBLE);
+        status.setText("Connexion du compte au hub…\n\nQuelques secondes.");
+        new Thread(() -> {
+            String err = "";
+            try {
+                URL u = new URL(BuildConfig.HUB_URL + "/api/accounts/import_curl");
+                HttpURLConnection c = (HttpURLConnection) u.openConnection();
+                c.setRequestMethod("POST");
+                c.setConnectTimeout(15000);
+                c.setReadTimeout(100000);
+                c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "application/json");
+                c.setRequestProperty("X-Hub", "1");
+                String hubCookie = CookieManager.getInstance().getCookie(BuildConfig.HUB_URL);
+                if (hubCookie != null) c.setRequestProperty("Cookie", hubCookie);
+                byte[] body = new JSONObject().put("curl", cookies).toString().getBytes(StandardCharsets.UTF_8);
+                try (OutputStream o = c.getOutputStream()) { o.write(body); }
+                int code = c.getResponseCode();
+                java.io.InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
+                java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                if (in != null) { byte[] buf = new byte[4096]; int n; while ((n = in.read(buf)) > 0 && bo.size() < 20000) bo.write(buf, 0, n); }
+                JSONObject r;
+                try { r = new JSONObject(bo.toString("UTF-8")); } catch (Exception e) { r = new JSONObject(); }
+                if (code == 401) err = "Session du hub expirée : rouvre l'application.";
+                else if (!r.optBoolean("ok", false)) err = r.optString("error", "Le hub a refusé la connexion (code " + code + ").");
+            } catch (Exception e) {
+                err = "Hub injoignable. Vérifie ta connexion.";
+            }
+            final String e2 = err;
+            ui.post(() -> {
+                if (e2.isEmpty()) { end(RESULT_OK, ""); return; }
+                // refus : on NE ferme PAS. Messenger a sans doute une étape à valider (consentement) : on rouvre la page pour la terminer
+                sending = false; failed = true; cleanPolls = 0;
+                cover.setVisibility(View.GONE);
+                web.setVisibility(View.VISIBLE);
+                hint.setText(e2 + " Termine les étapes affichées par Messenger, puis touche « Réessayer ».");
+                hint.setVisibility(View.VISIBLE);
+                retry.setVisibility(View.VISIBLE);
+                web.loadUrl(LOGIN_URL);
+                ui.postDelayed(poll, 1200);
+            });
+        }).start();
+    }
+
+    /** Efface toute trace Meta du téléphone (cookies + stockage) : le compte reste uniquement sur le serveur. */
+    private void wipeMeta() {
+        CookieManager cm = CookieManager.getInstance();
+        for (String site : new String[]{BuildConfig.LOGIN_COOKIE_URL, "https://www.messenger.com", "https://messenger.com", "https://www.facebook.com", "https://facebook.com", "https://m.facebook.com"}) {
+            String c = cm.getCookie(site);
+            if (c == null) continue;
+            String host = Uri.parse(site).getHost();
+            String dom = host.startsWith("www.") ? host.substring(3) : (host.startsWith("m.") ? host.substring(1) : "." + host);
+            for (String p : c.split(";")) {
+                String name = p.trim().split("=", 2)[0];
+                if (name.isEmpty()) continue;
+                for (String d : new String[]{dom, host})
+                    cm.setCookie(site, name + "=; Max-Age=0; Domain=" + d + "; Path=/");
+                cm.setCookie(site, name + "=; Max-Age=0; Path=/");
+            }
+        }
+        cm.flush();
+        try {
+            for (String o : new String[]{"https://www.messenger.com", "https://www.facebook.com", "https://m.facebook.com"}) WebStorage.getInstance().deleteOrigin(o);
+        } catch (Exception ignored) { }
+    }
+
+    private void end(int code, String msg) {
+        if (finished) return;
+        finished = true;
+        ui.removeCallbacks(poll);
+        wipeMeta();
+        try { web.loadUrl("about:blank"); web.clearHistory(); web.clearCache(true); } catch (Exception ignored) { }
+        setResult(code, new Intent().putExtra("msg", msg));
+        finish();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (!sending && web.canGoBack()) web.goBack(); else end(RESULT_CANCELED, "");
+    }
+
+    @Override
+    protected void onDestroy() {
+        ui.removeCallbacks(poll);
+        if (!finished) wipeMeta();
+        web.destroy();
+        super.onDestroy();
+    }
+}
