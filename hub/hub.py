@@ -2468,3 +2468,278 @@ def run_reply(key, ver):
     finally:
         ty.stop()
 
+
+def _humanize(chat, reply, system, user, lenient=False):
+    """Dernier filet : longueur proportionnée, pas de répétition d'un message déjà envoyé, emojis mesurés. Retourne None si rien d'utile à ajouter."""
+    key, acct = chat["key"], chat["account"]
+    own = [r["text"] for r in q("SELECT text FROM messages WHERE chat_key=? AND src='owner' AND deleted=0 AND length(text)>1 ORDER BY ts DESC LIMIT 40", (key,))]
+    if len(own) < 6:
+        own = [r["text"] for r in q("SELECT m.text AS text FROM messages m JOIN chats c ON c.key=m.chat_key WHERE m.src='owner' AND m.deleted=0 "
+                                    "AND length(m.text)>1 AND c.account=? ORDER BY m.ts DESC LIMIT 60", (acct,))]
+    lastc = (recent_untrusted(key, 1) or [""])[0]
+    tw = hz.target_words(own, lastc)
+    if lenient:   # réponse franche à « tu es une IA ? » : elle doit rester complète
+        tw = max(tw, 14)
+    rate = hz.emoji_rate(own) if len(own) >= 6 else 0.3
+    recent = [r["text"] for r in q("SELECT text FROM messages WHERE chat_key=? AND src IN ('owner','llm') AND deleted=0 AND ts>? ORDER BY ts DESC LIMIT 4",
+                                   (key, NOW() - 36 * 3_600_000))]
+
+    def dup(t):
+        return hz.words(t) >= 4 and any(hz.similarity(t, r) >= 0.6 for r in recent)
+
+    def problems(t):
+        pb = []
+        if hz.words(t) > tw * 1.6:
+            pb.append(f"trop longue : {tw} mots au maximum, une seule courte phrase")
+        if dup(t):
+            pb.append("trop semblable à un message déjà envoyé : dis quelque chose de très différent et très court, ou [SKIP] s'il n'y a rien à ajouter")
+        if hz.repeated_opener(t, recent):
+            pb.append("commence par les mêmes mots que tes derniers messages (tic d'automate) : commence autrement, directement par le fond, sans « haha ok »")
+        return pb
+    for _ in range(2):
+        pb = problems(reply)
+        if not pb:
+            break
+        try:
+            new = call_claude(system, user + "\nCorrection : ta réponse précédente est " + " ; ".join(pb) + ".", account=acct).strip().strip('"').strip()
+        except Exception:
+            break
+        if not new:
+            break
+        if split_skip(new)[0]:
+            return None
+        reply = new
+    if dup(reply):
+        return None
+    if hz.repeated_opener(reply, recent):
+        reply = hz.strip_opener(reply)   # dernier filet : on retire d'abord l'interjection d'ouverture répétée…
+    if hz.words(reply) > tw * 1.6:
+        reply = hz.cut_sentences(reply, tw)   # …puis on raccourcit si besoin
+    reply = hz.drop_repeated_emojis(reply, recent)
+    return hz.limit_emojis(reply, 0 if rate < 0.15 else 1).strip() or None
+
+
+def _run_reply(key, ver, ty):
+    with LLM_SEM:
+        for _attempt in range(3):
+            if versions.get(key) != ver:
+                return  # un message plus récent a relancé le minuteur
+            chat = (q("SELECT * FROM chats WHERE key=?", (key,)) or [None])[0]
+            if not chat or not chat["enabled"] or chat["is_group"] or is_paused(chat["account"]):
+                return
+            if NOW() - owner_recent_ts(key, chat) < int(setting("takeover_min", chat["account"])) * 60_000:
+                log("info", "Reprise en main récente : le LLM reste muet", key)
+                return
+            n_chat, n_all = llm_count_last_hour(key), llm_count_last_hour(account=chat["account"])
+            if n_chat >= chat["max_per_hour"] or n_all >= int(setting("max_per_hour_global", chat["account"])):
+                which = (f"cette conversation {n_chat}/{chat['max_per_hour']}" if n_chat >= chat["max_per_hour"]
+                         else f"globale {n_all}/{setting('max_per_hour_global', chat['account'])}")
+                x("UPDATE chats SET attention=1, attention_note=? WHERE key=?",
+                  (f"limite de réponses par heure atteinte ({which}) : augmente-la dans les réglages", key))
+                log("warn", f"Limite de réponses par heure atteinte ({which})", key)
+                return
+            level = setting("security_level", chat["account"])
+            susp = None if (chat["trusted"] or level == "off") else security.suspicious_input(recent_untrusted(key))
+            if susp and level == "quiet":
+                quiet_note(key, f"message suspect ({susp}) — réponse non bloquée")
+                susp = None
+            if susp:
+                security_event(key, "input", f"message suspect ({susp})")
+                if decoy_reply(key, chat, recent_untrusted(key), susp):
+                    return
+                x("UPDATE chats SET attention=1, attention_note=? WHERE key=?", (f"message suspect ({susp}) : aucune réponse automatique", key))
+                return
+            ai_q = any(hz.asks_if_bot(t) for t in recent_untrusted(key)[:2])
+            verdict = {}
+            watcher = None
+            if level == "strict" and not chat["trusted"] and setting("classifier", chat["account"]) == "1":
+                texts = recent_untrusted(key)
+                watcher = threading.Thread(target=lambda: verdict.update(r=classify_input(texts)), daemon=True)
+                watcher.start()  # en parallèle de la génération : pas de latence en plus
+            system, user = build_prompts(chat, hint=("L'interlocuteur demande ou taquine pour savoir s'il parle à une IA : réponds franchement et simplement, en une phrase "
+                                                     "naturelle, que tu es l'assistant automatique de " + setting("owner", chat["account"]) + " qui répond à sa place.") if ai_q else "")
+            # la génération démarre tout de suite (pas de latence en plus) ; pendant ce temps on « lit » les messages,
+            # et l'indicateur « en train d'écrire » n'apparaît qu'après ce délai de lecture
+            gen = {}
+
+            def _gen(system=system, user=user, acct=chat["account"]):
+                try:
+                    gen["r"] = call_claude(system, user, account=acct)
+                except Exception as ex:
+                    gen["e"] = ex
+            gth = threading.Thread(target=_gen, daemon=True)
+            gth.start()
+            rd = reading_delay(chat)
+            if rd > 0:
+                log("info", f"Lecture des messages : {rd} s avant d'écrire", key)
+                end = time.time() + rd
+                while time.time() < end:
+                    if versions.get(key) != ver:
+                        return  # un message plus récent a relancé le minuteur
+                    time.sleep(0.25)
+            ty.start(chat)   # le contact voit « en train d'écrire » à partir d'ici
+            gth.join(150)
+            if "e" in gen or "r" not in gen:
+                log("error", f"Claude CLI: {gen.get('e', 'pas de réponse')}", key)
+                return
+            reply = gen["r"]
+            if watcher:
+                watcher.join(90)
+                safe, why_ai = verdict.get("r", (False, "détecteur sans réponse"))
+                if not safe:
+                    security_event(key, "input", f"message suspect (analyse sémantique : {why_ai[:90]})")
+                    if decoy_reply(key, chat, texts, "analyse sémantique"):
+                        return
+                    x("UPDATE chats SET attention=1, attention_note=? WHERE key=?", (f"message jugé suspect par l'analyse sémantique ({why_ai[:90]}) : aucune réponse automatique", key))
+                    return
+            if versions.get(key) != ver:
+                return
+            last_in = q("SELECT MAX(ts) t FROM messages WHERE chat_key=? AND src='contact'", (key,))[0]["t"] or 0
+            if last_in > NOW() - 1500 and _attempt < 2:
+                continue  # un message vient d'arriver pendant la génération : on régénère
+            break
+        reply = reply.strip().strip('"').strip()
+        alert = reply.upper().startswith("[ALERTE]")
+        if alert:
+            reply = reply[8:].strip()
+            x("UPDATE chats SET attention=1, attention_note=? WHERE key=?", ("⚠ situation grave signalée (urgence, danger ou détresse) : réponds-lui toi-même dès que possible", key))
+            log("warn", "Situation grave signalée par le contact : message d'empathie envoyé, à toi de prendre le relais", key)
+        skip, why = split_skip(reply)
+        is_attack = reply.upper().startswith("[ATTAQUE]") or (skip and security.looks_like_attack(why))
+        if is_attack and not chat["trusted"] and level != "off":
+            security_event(key, "input", "manipulation détectée par le LLM")
+            if decoy_reply(key, chat, recent_untrusted(key), "manipulation détectée"):
+                return
+            x("UPDATE chats SET attention=1, attention_note=? WHERE key=?", ("manipulation détectée : aucune réponse automatique", key))
+            return
+        if not reply or skip or reply.upper().startswith("[ATTAQUE]"):
+            x("UPDATE chats SET attention=1, attention_note=? WHERE key=?", (why, key))
+            log("info", "Le LLM passe la main (à traiter par toi)", key)
+            return
+        reply = reply[:1500]
+        reply = reply if alert else _humanize(chat, reply, system, user, lenient=ai_q)
+        if not reply:
+            log("info", "Rien d'utile à ajouter (réponse répétitive ou trop longue pour ce contexte) : le LLM se tait", key)
+            return
+        ok_reply, why_blocked = vet_reply(chat, system, user, reply)
+        if not ok_reply:
+            hold_for_review(key, reply, why_blocked)
+            return
+        if chat["mode"] == "draft":
+            x("INSERT INTO drafts(chat_key,text,created) VALUES(?,?,?)", (key, reply, NOW()))
+            log("info", "Brouillon prêt", key)
+            return
+        time.sleep(min(len(reply) * 0.04, 8))  # frappe « humaine » : l'indicateur reste affiché pendant ce temps
+        if versions.get(key) != ver:
+            return
+        ty.stop()
+        send_text(key, reply, "llm", auto=True)
+        threading.Thread(target=_bg_memory, args=(key,), daemon=True).start()
+
+
+def send_text(key, text, src, auto=False):
+    chat = q("SELECT * FROM chats WHERE key=?", (key,))[0]
+    acct = ACCOUNTS.get(chat["account"])
+    if not acct:
+        return False
+    if chat["route"] == "e2ee" and chat["jid"]:
+        cmd = {"chat": chat["jid"], "text": text}
+    else:
+        cmd = {"thread": chat["thread"], "text": text}
+    if not acct.send(cmd):
+        log("error", "Envoi impossible : client arrêté", key)
+        return False
+    ts = NOW()
+    llm_sent.setdefault(key, []).append((text, ts))
+    llm_sent[key] = llm_sent[key][-10:]
+    x("INSERT INTO messages(id,chat_key,ts,sender,text,src,auto) VALUES(?,?,?,?,?,?,?)",
+      (f"{src}-{ts}-{random.randint(0, 99999)}", key, ts, "me", text, src, 1 if auto else 0))
+    x("UPDATE chats SET last_ts=MAX(last_ts,?), last_text=?, attention=0, attention_note='' WHERE key=?", (ts, text, key))
+    if src == "owner":
+        owner_last[key] = ts
+    log("info", ("Réponse du LLM envoyée" if src == "llm" else "Message envoyé") + f" ({len(text)} car.)", key)
+    return True
+
+
+# ---------------------------------------------------------------- API HTTP
+CHAT_FIELDS = ("key,name,last_ts,last_text,enabled,mode,is_group,attention,attention_note,route,account,instructions,max_per_hour,delay_s,takeover_off,unmute_ts,trusted,pinned")
+
+
+def _in(names):
+    """(« ?,?,? », valeurs) pour un filtre SQL « IN » ; « '' » quand la liste est vide."""
+    names = tuple(sorted(names))
+    return (",".join("?" * len(names)) or "''"), names
+
+
+def api_state():
+    vis = {n: a for n, a in ACCOUNTS.items() if n in mine()}
+    ph, names = _in(vis)
+    chats = q(f"SELECT {CHAT_FIELDS} FROM chats WHERE account IN ({ph}) ORDER BY last_ts DESC LIMIT 400", names)
+    mk = f"chat_key IN (SELECT key FROM chats WHERE account IN ({ph}))"
+    pend = {r["chat_key"]: r["c"] for r in q(f"SELECT chat_key, COUNT(*) c FROM drafts WHERE status='pending' AND {mk} GROUP BY chat_key", names)}
+    pics = {r["key"]: r["pic"] for r in q(f"SELECT key, pic FROM chats WHERE pic<>'' AND account IN ({ph})", names)}
+    counts = {r["chat_key"]: r["c"] for r in q(f"SELECT chat_key, COUNT(*) c FROM messages WHERE {mk} GROUP BY chat_key", names)}
+    # « non lues » : messages reçus depuis ta dernière réponse (la tienne ou celle du LLM), sur 30 jours
+    unread = {r["chat_key"]: r["c"] for r in q(
+        "SELECT m.chat_key, COUNT(*) c FROM messages m WHERE m.src='contact' AND m.deleted=0 AND m.ts>? AND m.ts > "
+        "COALESCE((SELECT MAX(o.ts) FROM messages o WHERE o.chat_key=m.chat_key AND o.src IN ('owner','llm')),0) "
+        f"AND m.{mk} GROUP BY m.chat_key",
+        (NOW() - 30 * 86_400_000, *names))}
+    for c in chats:
+        c["unread"] = min(unread.get(c["key"], 0), 99)
+        c["n_msgs"] = counts.get(c["key"], 0)
+        c["pic"] = hashlib.sha1(pics[c["key"]].encode()).hexdigest()[:10] if c["key"] in pics else ""
+        c["drafts"] = pend.get(c["key"], 0)
+        c["name"] = c["name"] or c["key"].split(":")[-1]
+    st = {k: setting(k) for k in SETTING_DEFAULTS}
+    if AUTH.enabled:
+        for k in PRIVATE_KEYS:
+            st[k] = SETTING_DEFAULTS[k]
+        if not is_admin():   # « pause générale » d'un utilisateur = tous SES comptes en pause
+            st["paused"] = "1" if st["paused"] == "1" or (vis and all(setting("paused", n) == "1" for n in vis)) else "0"
+    me = cur()
+    admin = (not AUTH.enabled) or is_admin()
+    visible_log = [e for e in LOG if (e.get("acct") in vis) or (admin and not e.get("acct"))]
+    return {
+        "settings": st,
+        "accounts": [{"name": a.name, "label": a.label or a.name, "has_device": has_registered_device(a.dir), **a.state} for a in vis.values()],
+        "sync": dict(SYNC_INFO), "llm_last_hour": sum(llm_count_last_hour(account=n) for n in vis), "owner_msgs": sum(owner_count(n) for n in vis),
+        "busy": {"style": any(n in STYLE_BUSY for n in vis), "import": BG.get(cur_name(), "")},
+        "account_settings": {a: {r["k"]: r["v"] for r in q("SELECT k,v FROM account_settings WHERE account=?", (a,)) if r["k"] != "__x"} for a in vis},
+        "owner_msgs_by_account": {a: owner_count(a) for a in vis},
+        "chats": chats, "log": [{k: v for k, v in e.items() if k != "acct"} for e in visible_log][-80:], "tasks": tasks_view(),
+        "can_login": LOGIN_PY.exists() and LOGIN_SCRIPT.exists(), "login_remote": REMOTE_LOGIN, "auth": AUTH.enabled,
+        "me": {"name": me["name"], "role": me["role"]} if (me and AUTH.enabled) else None,
+    }
+
+
+def usage_summary(since, names=None):
+    """Consommation du LLM depuis `since` : appels, tokens (entrée = neuf + cache lu + cache écrit), sortie, part servie par le cache, coût."""
+    kinds = {}
+    ph, args = _in(names) if names is not None else ("", ())
+    flt = f" AND account IN ({ph})" if names is not None else ""
+    for r in q(f"SELECT kind, COUNT(*) n, SUM(input) i, SUM(cache_read) cr, SUM(cache_write) cw, SUM(output) o, SUM(cost) c FROM llm_usage WHERE ts>?{flt} GROUP BY kind", (since, *args)):
+        kinds[r["kind"]] = {"calls": r["n"], "in": (r["i"] or 0) + (r["cr"] or 0) + (r["cw"] or 0), "cached": r["cr"] or 0, "out": r["o"] or 0, "cost": round(r["c"] or 0, 4)}
+    tot = {k: sum(v[k] for v in kinds.values()) for k in ("calls", "in", "cached", "out", "cost")}
+    tot["cost"] = round(tot["cost"], 4)
+    tot["cache_pct"] = round(100 * tot["cached"] / tot["in"]) if tot["in"] else 0
+    return {"total": tot, "kinds": kinds}
+
+
+def api_stats():
+    """Chiffres d'activité (comptages seulement, jamais de contenu), limités aux comptes de l'utilisateur."""
+    vis = {n: a for n, a in ACCOUNTS.items() if n in mine()}
+    ph, names = _in(vis)
+    ck = f"(SELECT key FROM chats WHERE account IN ({ph}))"
+    since = NOW() - 14 * 86_400_000
+    rows = q(f"SELECT strftime('%Y-%m-%d', ts/1000, 'unixepoch', 'localtime') d, src, COUNT(*) c FROM messages WHERE ts>? AND deleted=0 AND chat_key IN {ck} GROUP BY d, src", (since, *names))
+    days = {}
+    for r in rows:
+        days.setdefault(r["d"], {"contact": 0, "owner": 0, "llm": 0})[r["src"] if r["src"] in ("contact", "owner", "llm") else "contact"] += r["c"]
+    series = []
+    for i in range(13, -1, -1):
+        d = time.strftime("%Y-%m-%d", time.localtime(time.time() - i * 86400))
+        series.append({"d": d, **days.get(d, {"contact": 0, "owner": 0, "llm": 0})})
+    disk = 0
+    for a in vis.values():
+        try:
