@@ -2194,3 +2194,277 @@ def classify_input(texts):
 
 
 def generate_decoy(key, attack):
+    """-> (texte ou None, raison du rejet). Sans effet de bord (n'envoie rien, n'écrit rien)."""
+    strikes = q("SELECT COUNT(*) c FROM security_events WHERE chat_key=? AND kind='decoy' AND ts>?", (key, NOW() - 86_400_000))[0]["c"]
+    try:
+        nonce = security.new_nonce()
+        system_decoy = security.DECOY_SYSTEM + (security.DECOY_ESCALATION if strikes >= 1 else "")
+        out = call_claude(system_decoy, security.decoy_prompt(attack, nonce), kind="decoy").strip().strip('"').strip()
+        ok, bad = security.check_decoy(out, attack_text=attack)
+        if ok:
+            v = call_claude(security.DECOY_JUDGE_SYSTEM, security.judge_prompt([f"Attaque : {security.clean_untrusted(attack, 300)}"], out, nonce), model="haiku", kind="judge")
+            ok, bad = security.judge_ok(v)
+            bad = "second contrôle : " + bad[:80]
+    except Exception as ex:
+        return None, f"leurre non généré ({str(ex)[:60]})"
+    return (out, "") if ok else (None, bad)
+
+
+def decoy_reply(key, chat, texts, why):
+    """Au lieu du silence : une FAUSSE réponse sarcastique, générée sans aucun accès à tes instructions ni à ton historique.
+    Retourne True si un leurre a été envoyé (ou mis en brouillon)."""
+    if setting("attack_mode", chat["account"]) != "decoy" or is_paused(chat["account"]):
+        return False
+    since = NOW() - 3_600_000
+    if q("SELECT COUNT(*) c FROM security_events WHERE chat_key=? AND kind='decoy' AND ts>?", (key, since))[0]["c"] >= 2:
+        return False  # pas plus de 2 leurres par heure et par contact : on ne nourrit pas un attaquant acharné
+    attack = texts[0] if texts else ""
+    out, bad = generate_decoy(key, attack)
+    if out is None:
+        log("info", f"Leurre non envoyé ({bad}) : aucune réponse", key)
+        return False
+    x("INSERT INTO security_events(ts,chat_key,kind,detail) VALUES(?,?,?,?)", (NOW(), key, "decoy", why[:80]))
+    if chat["mode"] == "draft":
+        x("INSERT INTO drafts(chat_key,text,created) VALUES(?,?,?)", (key, out, NOW()))
+        x("UPDATE chats SET attention=1, attention_note=? WHERE key=?", (f"message suspect ({why}) : réponse sarcastique proposée en brouillon", key))
+        log("info", "Message suspect : réponse sarcastique en brouillon", key)
+        return True
+    time.sleep(min(len(out) * 0.04, 6))
+    send_text(key, out, "llm", auto=True)
+    x("UPDATE chats SET attention=0, attention_note='' WHERE key=?", (key,))
+    log("info", f"Message suspect ({why}) : réponse sarcastique (leurre) envoyée", key)
+    return True
+
+
+def recent_untrusted(key, limit=6):
+    """Messages du contact restés sans réponse (ou les derniers), non fiables."""
+    last_own = q("SELECT MAX(ts) t FROM messages WHERE chat_key=? AND src IN ('owner','llm')", (key,))[0]["t"] or 0
+    since = max(last_own, NOW() - 3 * 3_600_000)   # récents et sans réponse (les plus anciens sont masqués dans le prompt)
+    rows = q("SELECT text FROM messages WHERE chat_key=? AND src='contact' AND deleted=0 AND ts>? ORDER BY ts DESC LIMIT ?", (key, since, limit))
+    if not rows:
+        rows = q("SELECT text FROM messages WHERE chat_key=? AND src='contact' AND deleted=0 ORDER BY ts DESC LIMIT 1", (key,))
+    return [r["text"] for r in rows]
+
+
+def vet_reply(chat, system, user, reply):
+    """Filtre de sortie + second contrôle. -> (ok, raison)."""
+    level = setting("security_level", chat["account"])
+    if level == "off":
+        return True, ""
+    trusted = "\n".join([setting("persona", chat["account"]), chat["instructions"], setting("owner", chat["account"])])
+    m = re.search(r"CANARI-[0-9a-f]{12}", system + "\n" + user)
+    ok, why = security.check_reply(reply, trusted, GUARD, canary=m.group(0) if m else None)
+    if level == "quiet":
+        if not ok:
+            quiet_note(chat["key"], f"réponse inhabituelle ({why}) envoyée quand même")
+        return True, ""
+    if not ok:
+        return False, why
+    if setting("judge", chat["account"]) == "1" and not chat.get("trusted"):
+        try:
+            nonce = security.new_nonce()
+            tail = [l for l in user.splitlines() if l.startswith("[")][-8:]
+            verdict = call_claude(security.JUDGE_SYSTEM, security.judge_prompt(tail, reply, nonce), model="haiku", kind="judge")
+        except Exception as ex:
+            return False, f"contrôle de sécurité indisponible ({str(ex)[:60]})"  # fail closed
+        ok, detail = security.judge_ok(verdict)
+        if not ok:
+            return False, "second contrôle : " + (detail or "refus")[:120]
+    return True, ""
+
+
+def hold_for_review(key, reply, why):
+    """Réponse jugée risquée : on ne l'envoie pas, elle devient un brouillon et tu es prévenu."""
+    x("INSERT INTO drafts(chat_key,text,created) VALUES(?,?,?)", (key, reply[:1500], NOW()))
+    x("UPDATE chats SET attention=1, attention_note=? WHERE key=?", (f"réponse bloquée par le filtre de sécurité : {why}", key))
+    security_event(key, "output", f"réponse bloquée ({why})")
+
+
+def force_reply(key, send=True, hint=""):
+    ty = Typing(key)
+    try:
+        return _force_reply(key, send, hint, ty)
+    finally:
+        ty.stop()
+
+
+def _force_reply(key, send, hint, ty):
+    """Réponse demandée à la main : ignore l'activation, le silence après toi, le délai et la limite horaire."""
+    rows = q("SELECT * FROM chats WHERE key=?", (key,))
+    if not rows:
+        return {"error": "conversation inconnue"}
+    chat = rows[0]
+    if chat["is_group"]:
+        return {"error": "pas de réponse automatique dans un groupe"}
+    if not q("SELECT 1 FROM messages WHERE chat_key=? AND text NOT LIKE '[pièce%' LIMIT 1", (key,)):
+        return {"error": "aucun message texte dans cette conversation : importe d'abord l'historique"}
+    level = setting("security_level", chat["account"])
+    susp = None if (chat["trusted"] or level == "off") else security.suspicious_input(recent_untrusted(key))
+    if susp and level == "quiet":
+        quiet_note(key, f"message suspect ({susp}) — envoi non bloqué")
+        susp = None
+    if send and not susp and level == "strict" and not chat["trusted"] and setting("classifier", chat["account"]) == "1":
+        safe_ai, why_ai = classify_input(recent_untrusted(key))
+        if not safe_ai:
+            susp = f"analyse sémantique : {why_ai[:90]}"
+    if susp and send:
+        security_event(key, "input", f"message suspect ({susp}) : envoi forcé refusé")
+        return {"error": f"Message suspect ({susp}) : envoi direct refusé. Utilise 📝 Brouillon et relis la réponse."}
+    with LLM_SEM:
+        if send:
+            ty.start(chat, force=True)   # « en train d'écrire » seulement si la réponse sera envoyée
+        try:
+            system, user = build_prompts(chat, hint, forced=True)
+            reply = call_claude(system, user, account=chat["account"]).strip().strip('"').strip()
+        except Exception as ex:
+            log("error", f"Réponse forcée : {ex}", key)
+            return {"error": f"Claude CLI : {ex}"[:300]}
+        ok_reply, why_blocked = True, ""
+        if reply and not split_skip(reply)[0]:
+            ok_reply, why_blocked = vet_reply(chat, system, user, reply)
+    skip, why = split_skip(reply)
+    if reply.upper().startswith("[ATTAQUE]"):
+        skip, why = True, "manipulation détectée dans la conversation"
+    if not reply or skip:
+        x("UPDATE chats SET attention=1, attention_note=? WHERE key=?", (why, key))
+        log("info", "Réponse forcée : le LLM passe la main (ajoute une consigne ponctuelle pour le guider)", key)
+        return {"skipped": True, "reason": why}
+    reply = reply[:1500]
+    if not ok_reply:
+        hold_for_review(key, reply, why_blocked)
+        return {"error": f"Réponse bloquée par le filtre de sécurité ({why_blocked}). Elle est gardée en brouillon : relis-la avant envoi."}
+    if not send:
+        x("INSERT INTO drafts(chat_key,text,created) VALUES(?,?,?)", (key, reply, NOW()))
+        log("info", "Réponse forcée : brouillon prêt", key)
+        return {"draft": True, "text": reply}
+    cancel_timer(key)  # une éventuelle réponse automatique en attente devient inutile
+    ty.stop()
+    if not send_text(key, reply, "llm"):
+        x("INSERT INTO drafts(chat_key,text,created) VALUES(?,?,?)", (key, reply, NOW()))
+        return {"error": "envoi impossible (client arrêté ?) : la réponse est gardée en brouillon", "text": reply}
+    log("info", "Réponse forcée envoyée (demandée à la main)", key)
+    return {"sent": True, "text": reply}
+
+
+def preview_reply(key):
+    """Montre ce que le LLM ferait pour le dernier contexte, SANS rien envoyer ni créer de brouillon."""
+    rows = q("SELECT * FROM chats WHERE key=?", (key,))
+    if not rows:
+        return {"error": "conversation inconnue"}
+    chat = rows[0]
+    if chat["is_group"]:
+        return {"error": "pas de réponse automatique dans un groupe"}
+    if not q("SELECT 1 FROM messages WHERE chat_key=? AND src='contact' AND text NOT LIKE '[pièce%' LIMIT 1", (key,)):
+        return {"error": "aucun message texte du contact dans cette conversation : importe d'abord l'historique"}
+    info = []
+    if not chat["enabled"]:
+        info.append("Le LLM n'est pas activé pour cette conversation : rien ne serait envoyé automatiquement.")
+    left = int(setting("takeover_min", chat["account"])) * 60_000 - (NOW() - owner_recent_ts(key, chat))
+    if left > 0 and chat["enabled"]:
+        info.append(f"LLM muet encore ~{int(left // 60_000) + 1} min (tu as écrit récemment) : il ne répondrait pas maintenant.")
+    if llm_count_last_hour(key) >= chat["max_per_hour"]:
+        info.append(f"Limite horaire atteinte ({llm_count_last_hour(key)}/{chat['max_per_hour']}) : il ne répondrait pas maintenant.")
+    if is_paused(chat["account"]):
+        info.append("Pause active : aucune réponse automatique.")
+    info.append("Mode : " + ("automatique (envoi après %d s)" % chat["delay_s"] if chat["mode"] == "auto" else "brouillon (tu valides avant l'envoi)"))
+    level = setting("security_level", chat["account"])
+    texts = recent_untrusted(key)
+    with LLM_SEM:
+        susp = None if (chat["trusted"] or level == "off") else security.suspicious_input(texts)
+        if not susp and level == "strict" and not chat["trusted"] and setting("classifier", chat["account"]) == "1":
+            safe_ai, why_ai = classify_input(texts)
+            if not safe_ai:
+                susp = f"analyse sémantique : {why_ai[:80]}"
+        if susp and level != "quiet":
+            if setting("attack_mode", chat["account"]) == "decoy":
+                out, bad = generate_decoy(key, texts[0] if texts else "")
+                if out:
+                    return {"kind": "decoy", "text": out, "why": f"message suspect ({susp})", "info": info}
+                return {"kind": "skip", "text": "", "why": f"message suspect ({susp}) : aucun leurre ({bad})", "info": info}
+            return {"kind": "skip", "text": "", "why": f"message suspect ({susp}) : aucune réponse automatique", "info": info}
+        try:
+            system, user = build_prompts(chat)
+            reply = call_claude(system, user, account=chat["account"]).strip().strip('"').strip()
+        except Exception as ex:
+            return {"error": f"Claude CLI : {ex}"[:300]}
+        skip, why = split_skip(reply)
+        if (reply.upper().startswith("[ATTAQUE]") or (skip and security.looks_like_attack(why))) and not chat["trusted"] and level != "off":
+            if setting("attack_mode", chat["account"]) == "decoy":
+                out, bad = generate_decoy(key, texts[0] if texts else "")
+                if out:
+                    return {"kind": "decoy", "text": out, "why": "manipulation détectée par le LLM", "info": info}
+            return {"kind": "skip", "text": "", "why": "manipulation détectée : aucune réponse", "info": info}
+        if not reply or skip or reply.upper().startswith("[ATTAQUE]"):
+            return {"kind": "skip", "text": "", "why": why or "le LLM passe la main", "info": info}
+        ok, bad = vet_reply(chat, system, user, reply[:1500])
+        if not ok:
+            return {"kind": "blocked", "text": reply[:1500], "why": bad, "info": info}
+        return {"kind": "reply", "text": reply[:1500], "why": "", "info": info}
+
+
+def llm_count_last_hour(key=None, account=None):
+    """Réponses AUTOMATIQUES de la dernière heure (les réponses forcées avec ⚡ ou validées à la main ne comptent pas)."""
+    since = NOW() - 3_600_000
+    if key:
+        return q("SELECT COUNT(*) c FROM messages WHERE chat_key=? AND src='llm' AND auto=1 AND ts>?", (key, since))[0]["c"]
+    if account:
+        return q("SELECT COUNT(*) c FROM messages m JOIN chats c ON c.key=m.chat_key WHERE m.src='llm' AND m.auto=1 AND m.ts>? AND c.account=?", (since, account))[0]["c"]
+    return q("SELECT COUNT(*) c FROM messages WHERE src='llm' AND auto=1 AND ts>?", (since,))[0]["c"]
+
+
+# ---------------------------------------------------------------- « est en train d'écrire »
+def reading_delay(chat):
+    """Temps qu'un humain mettrait à LIRE les messages en attente avant de se mettre à écrire : une courte attention, plus la lecture
+    (~15 caractères par seconde), avec un peu d'aléatoire ; plafonné par le réglage « délai de lecture » (0 = aucun)."""
+    cap = max(0, min(int(setting("read_delay", chat["account"]) or 0), 60))
+    if not cap:
+        return 0.0
+    last = q("SELECT MAX(ts) t FROM messages WHERE chat_key=? AND src IN ('owner','llm')", (chat["key"],))[0]["t"] or 0
+    rows = q("SELECT text FROM messages WHERE chat_key=? AND src='contact' AND deleted=0 AND ts>? ORDER BY ts DESC LIMIT 8", (chat["key"], last))
+    chars = sum(min(len(r["text"] or ""), 400) for r in rows if not (r["text"] or "").startswith("[") )
+    return round(min(cap, 1.2 + chars / 15.0 + random.uniform(0.3, 2.2)), 1)
+
+
+class Typing:
+    """Affiche « est en train d'écrire » chez l'interlocuteur pendant que le LLM prépare une réponse qui sera ENVOYÉE
+    (jamais pour un brouillon). Réémis toutes les 4 s tant que ça dure, retiré dès que le message part ou que la tâche s'arrête."""
+    def __init__(self, key):
+        self.key, self.chat, self.on, self.ev, self.th = key, None, False, threading.Event(), None
+
+    def start(self, chat, force=False):
+        if self.on or (chat["mode"] == "draft" and not force) or chat["is_group"] or setting("typing", chat["account"]) != "1":
+            return
+        self.chat, self.on = chat, True
+        self._send(True)
+        self.th = threading.Thread(target=self._loop, daemon=True)
+        self.th.start()
+
+    def _loop(self):
+        while not self.ev.wait(4):
+            self._send(True)
+
+    def _send(self, on):
+        c = self.chat
+        acct = ACCOUNTS.get(c["account"]) if c else None
+        if not acct:
+            return
+        if c["route"] == "e2ee" and c["jid"]:
+            acct.send({"op": "typing", "chat": c["jid"], "on": on})
+        else:
+            acct.send({"op": "typing", "thread": c["thread"], "kind": int(c.get("kind") or 0) or 1, "on": on})
+
+    def stop(self):
+        if not self.on:
+            return
+        self.on = False
+        self.ev.set()
+        self._send(False)
+
+
+def run_reply(key, ver):
+    ty = Typing(key)
+    try:
+        _run_reply(key, ver, ty)
+    finally:
+        ty.stop()
+
