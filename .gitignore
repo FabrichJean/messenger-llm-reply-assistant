@@ -48,3 +48,52 @@ hub/*.tmp
 *.keystore
 keystore.properties
 signing.properties
+local.properties
+
+# ── Binaires et artefacts de build ──
+/messenger-lite
+*.apk
+*.aab
+*.exe
+*.test
+*.out
+mobile/.gradle/
+mobile/build/
+mobile/app/build/
+mobile/captures/
+.gradle/
+build/
+# Le Dockerfile copie dist/relais.apk : à reconstruire (mobile/) ou à fournir avant « docker compose build ».
+relais-connect.zip
+
+# ── Journaux ──
+*.log
+logs/
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# ── Sauvegardes et temporaires ──
+*.bak
+*.orig
+*.rej
+*.swp
+*.tmp
+*.enc
+*.tar.gz
+*.tar.gz.*
+backup-*/
+
+# ── Éditeurs et système ──
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+# ── Notes locales (docs/pass : ne pas versionner) ──
+docs/
