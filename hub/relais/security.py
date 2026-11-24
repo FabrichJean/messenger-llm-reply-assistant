@@ -18,12 +18,17 @@ MAX_REPLY = 700         # longueur maximale d'une réponse envoyée automatiquem
 
 
 # ---------------------------------------------------------------- nettoyage
+_LINE_BREAKS = re.compile(r"[\r\n\u2028\u2029\x85\x0b\x0c\x1c\x1d\x1e]+")
+
+
 def clean_untrusted(text, limit=MAX_MSG):
-    """Retire caractères de contrôle/invisibles/bidi, neutralise nos marqueurs, borne la longueur."""
-    t = "".join(ch for ch in str(text) if ch in "\n\t" or unicodedata.category(ch)[0] != "C")
+    """Retire caractères de contrôle/invisibles/bidi, neutralise nos marqueurs, borne la longueur.
+    Le résultat tient sur UNE SEULE ligne (les sauts de ligne deviennent « ⏎ ») : un contact ne peut pas faire commencer une ligne par
+    « Moi : » ou par un horodatage pour simuler un tour de parole du propriétaire dans l'historique que lit le modèle."""
+    t = _LINE_BREAKS.sub(" ⏎ ", str(text))
+    t = "".join(ch for ch in t if ch == "\t" or unicodedata.category(ch)[0] != "C")
     t = t.replace("<<<", "‹‹‹").replace(">>>", "›››")
-    t = re.sub(r"[ \t]+", " ", t)
-    t = re.sub(r"\n{3,}", "\n\n", t).strip()
+    t = re.sub(r"[ \t]+", " ", t).strip()
     return t[:limit]
 
 
@@ -60,15 +65,19 @@ _INJ = [
     r"\b(system|developer|systeme|developpeur)\s*(prompt|message|instruction|mode)\b",
     r"\bprompt\s*(systeme|system|initial|cache|secret)\b",
     r"\b(reveal|show|print|repeat|display|leak|dump|donne|donnes|affiche|montre|revele|repete|recite|copie|liste)\b.{0,50}\b(prompt|instruction|consigne|regle|configuration|systeme|system|tes secrets)",
-    r"\b(you are now|you're now|from now on|tu es maintenant|desormais|a partir de maintenant|act as|pretend|joue le role|fais semblant|agis comme|simule)\b",
-    r"\b(jailbreak|dan mode|developer mode|mode developpeur|do anything now|sans restriction|no restrictions|unfiltered|sans filtre)\b",
+    r"\b(you are now|you're now|tu es maintenant)\b.{0,40}\b(assistant|ia|ai|bot|robot|dan|chatbot|gpt|model|modele|libre|free|sans|unrestricted|jailbreak|developer|developpeur|mode|root|admin)\b",
+    r"\b(from now on|desormais|a partir de maintenant)\b[ ,]*(you must|you will|you are to|you should|tu dois|tu vas|tu reponds|tu ne dois|tu n'as plus|ne reponds|reponds|ignore|obeis|obey|answer|respond|write|ecris)\b",
+    r"\b(act as|pretend (to be|you are|you're)|joue le role (de|d')|fais semblant d'etre|agis comme (un|une|si tu etais)|simule (un|une))\b.{0,30}\b(assistant|ia|ai|bot|dan|unrestricted|autre|another|different|admin|developer|developpeur|hacker|root|terminal|chatgpt|gpt|persona|personnage|sans)\b",
+    r"\b(jailbreak|dan mode|do anything now|sans restriction|no restrictions|unfiltered|sans filtre)\b",
+    r"\b(active|activate|enable|passe en|switch to|enter|entre en)\b.{0,25}\b(developer mode|mode developpeur|god mode|mode dieu)\b",
     r"</?\s*(system|assistant|user|instructions?|human|conversation)\s*>",
     r"\[\s*/?\s*(system|inst|assistant)\s*\]",
     r"^\s*#{2,}\s*(system|instruction)",
     r"\b(begin|end)[ _-]?(of)?[ _-]?(system|prompt|instructions?|conversation)\b",
     r"(<<<|>>>)\s*(fin|conversation|end)",
-    r"\b(ecris|reponds|write|reply|say|send|envoie|dis)\b.{0,30}\b(exactement|exactly|mot pour mot|verbatim|uniquement ce texte|only this)\b",
-    r"\b(l'admin|admin|owner|proprietaire|anthropic|openai|developpeur|ton createur|your creator)\b.{0,40}\b(m'a dit|a dit|told|says|autorise|authoriz|ordonne|demande de)\b",
+    r"\b(ecris|reponds|write|reply|say|send|envoie)\b.{0,20}\b(exactement|exactly|verbatim|uniquement ce texte|only this|mot pour mot)\b.{0,30}\b(phrase|texte|message|reponse|text|sentence|answer|suivant|following|ceci|this)\b",
+    r"\b(ecris|reponds|write|reply|say)\b.{0,15}\b(exactement|exactly|verbatim)\s*:",
+    r"\b(l'admin|admin|owner|proprietaire|anthropic|openai|developpeur|ton createur|your creator)\b.{0,40}\b(m'a dit de|a dit de|a dit que tu|told me to|told you to|says (you|to)|autorise (le|l'|a|ton)|authoriz|ordonne|demande de)\b",
     r"\b(mot de passe|password|cookie|token|api[ _-]?key|cle api|identifiant|secret)\b.{0,40}\b(donne|give|send|envoie|affiche|show|reveal|partage|ecris)\b",
     r"\b(repete|repeat|recopie|copie|reprends)\b.{0,40}\b(au-dessus|above|ci-dessus|plus haut|debut de|beginning|tout ce que|everything)",
         r"\b(ignora|olvida|ignore|esqueca|esquece|ignoriere|vergiss|dimentica|oublie)\b.{0,40}\b(instrucciones|reglas|instrucoes|regras|anweisungen|regeln|istruzioni|regole|anteriores|previas|vorherigen)",
@@ -78,6 +87,13 @@ _INJ = [
     r"\b(new|updated|revised|nouvelles?|mises? a jour des|derniere?s?)\s+(system\s+)?(instructions?|consignes?|regles?|rules|directives?)\s*(:|pour toi|for you|you must|tu dois|a suivre|to follow)",
     r"\b(override|bypass|desactive|disable|turn off|contourne)\b.{0,30}\b(securite|safety|filter|filtre|protection|guard|garde-fou|restriction)",
     r"\b(execute|run|lance)\b.{0,30}\b(commande|command|script|code|shell|bash)\b",
+    # --- formulations naturelles courantes (motifs précis : un faux positif désactive le LLM pour ce contact)
+    r"\b(oublie|oubliez|forget)\b.{0,20}\b(tout\s+ce\s+qu'?\s*(on|je|l'?on|tu)\s+t'?\s*a|everything\s+(i|you|we)\s+(said|told|gave))",
+    r"\b(mot pour mot|verbatim|word for word|a la lettre)\b.{0,45}\b(instruction|consigne|prompt|regle|directive)",
+    r"\b(instruction|consigne|directive|regle)s?\b.{0,25}\b(que tu as recue?s?|que l'?on t'?a donnee?s?|you (were|have been) given|you received|you were told)",
+    r"\bprompt\s*(interne|complet|entier|integral|original)\b",
+    r"\b(mets|met|ecris|ajoute|inclus|insere|include|put|append|add)\b.{0,30}\b(memoire|memory|prompt|instructions?|historique|history|conversation|messages?)\b.{0,40}\b(lien|link|url|https?)",
+    r"\b(aza|tsy)\s+mihaino\b.{0,25}\b(torolalana|fitsipika|baiko)",
 ]
 _INJ_RE = [re.compile(p, re.S) for p in _INJ]
 _BLOB_RE = re.compile(r"[a-z0-9+/]{60,}={0,2}")   # gros blob opaque (base64, etc.) dans le message d'origine
@@ -135,7 +151,12 @@ def _scan_one(raw):
         return "bloc de texte opaque (encodé ?)"
     sq = _squash(raw)
     if any(k in sq for k in _SQUASHED):
-        return "injection masquée (lettres espacées ou symboles)"
+        # une phrase NORMALE qui contient l'expression (« le mode développeur de mon téléphone ») n'est pas un déguisement :
+        # on ne conclut à des lettres espacées / séparées par des symboles que si le message est truffé de lettres isolées
+        tokens = re.findall(r"[a-z0-9]+", folded)
+        singles = sum(1 for t in tokens if len(t) == 1)
+        if singles >= 4 or (tokens and singles / len(tokens) >= 0.3):
+            return "injection masquée (lettres espacées ou symboles)"
     for dec in _decoded_variants(raw):
         d_fold = _fold(dec)
         if any(rx.search(d_fold) for rx in _INJ_RE):
@@ -163,11 +184,12 @@ _URL = re.compile(r"(?i)\b(?:https?://|www\.)\S+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.
 _PHONE = re.compile(r"\+?\d[\d .\-]{7,}\d")
 _EMAIL = re.compile(r"[\w.+\-]+@[\w\-]+\.[\w.\-]+")
 _SECRET = re.compile(r"\b(?:sk-|xox[bp]-|ghp_|AKIA)[A-Za-z0-9_\-]{8,}|\b[A-Za-z0-9+/_\-]{32,}\b")
+_PW_SHARE = re.compile(r"(?i)\b(mot de passe|password|mdp|passcode|wi-?fi|code (?:pin|secret|d'acc[eè]s)|pin)\b[^.\n]{0,20}?(?:est|c'est|:|=|is)\s*[\"']?(\S{4,})")
 _IBAN = re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9 ]{10,30}\b")
 _SELF = re.compile(r"(?i)\b(system prompt|prompt syst[eè]me|mes instructions|mes consignes|mes r[eè]gles|anthropic|openai|chatgpt|\bgpt\b|claude|large language model|mod[eè]le de langage|\bllm\b)\b")
 _PATH = re.compile(r"(?i)(/Users/|/home/|[a-z]:\\|~/\.|\bcookies?\.json\b|e2ee\.db|hub\.db|history_device)")
 _CODE = re.compile(r"(?is)```|<\s*(script|iframe|img|a|html|svg)\b")
-_LABEL = re.compile(r"(?im)^\s*(moi|interlocuteur|assistant|system|syst[eè]me)\s*:")
+_LABEL = re.compile(r"(?im)^\s*(moi|interlocuteur|assistant|system|syst[eè]me)\s*:|\[\d{1,2}/\d{1,2} \d{1,2}:\d{2}\]\s*\S+\s*:|<<<|>>>|‹‹‹|›››")
 
 
 def _digits(s):
@@ -186,6 +208,17 @@ def new_canary():
     return "CANARI-" + secrets.token_hex(6)
 
 
+_DEOBF = [(re.compile(r"(?i)\s*[\[(]\s*(?:\.|dot|point)\s*[\])]\s*"), "."), (re.compile(r"(?i)\s*[\[(]\s*(?:@|at|arobase)\s*[\])]\s*"), "@"),
+           (re.compile(r"(?i)\b(\w+) dot (com|net|org|io|fr|mg|xyz|ru|top|info)\b"), r"\1.\2")]
+
+
+def _deobfuscate(r):
+    """Remet à plat « evil[.]example », « a (at) b (dot) com » pour que les contrôles de liens et d'e-mails voient la vraie adresse."""
+    for rx, rep in _DEOBF:
+        r = rx.sub(rep, r)
+    return r
+
+
 def check_reply(reply, trusted_text, guard_text, canary=None):
     """Filtre strict sur la réponse. trusted_text = textes du propriétaire (ce qui est permis de citer).
     -> (ok, raison)"""
@@ -194,6 +227,7 @@ def check_reply(reply, trusted_text, guard_text, canary=None):
     trusted_digits = _digits(trusted_text)
     if len(r) > MAX_REPLY:
         return False, "réponse trop longue"
+    r = _deobfuscate(r)
     if _CODE.search(r):
         return False, "contient du code ou du HTML"
     if _LABEL.search(r):
@@ -210,6 +244,9 @@ def check_reply(reply, trusted_text, guard_text, canary=None):
             return False, "contient un numéro non autorisé"
     if _IBAN.search(r) or _SECRET.search(r):
         return False, "contient un identifiant ou un secret"
+    for m in _PW_SHARE.finditer(r):
+        if _fold(m.group(2)).strip(".,;:!?)»\"'") not in trusted:        # un mot de passe / code n'est jamais communiqué, sauf s'il vient du propriétaire lui-même
+            return False, "communique un mot de passe ou un code"
     if _SELF.search(r):
         return False, "parle de ses instructions ou du modèle"
     if _PATH.search(r):
