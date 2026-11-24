@@ -547,3 +547,277 @@ def ext_import(code, cookies, ip):
 
 
 def ext_zip(origin):
+    """Extension prête à installer, configurée pour CE hub (adresse du hub incluse)."""
+    import io
+    import zipfile
+    login_url = os.environ.get("HUB_EXT_LOGIN_URL", "https://www.messenger.com/")
+    cookie_url = os.environ.get("HUB_EXT_COOKIE_URL", "https://www.messenger.com")
+    cu = urlparse(cookie_url)
+    cookie_host = "https://*.messenger.com/*" if (cu.hostname or "").endswith("messenger.com") else f"{cu.scheme}://{cu.hostname}/*"
+    manifest = (EXT_DIR / "manifest.template.json").read_text().replace("__COOKIE_HOST__", cookie_host).replace("__HUB_ORIGIN__", origin)
+    cfg = "const CFG = " + json.dumps({"hub": origin, "loginUrl": login_url, "cookieUrl": cookie_url}) + ";\n"
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("relais-connect/manifest.json", manifest)
+        z.writestr("relais-connect/config.js", cfg)
+        for f in ("background.js", "content.js", "README.txt"):
+            z.write(EXT_DIR / f, "relais-connect/" + f)
+    return buf.getvalue()
+
+
+def _lkey(owner=None):
+    return owner or "local"
+
+
+def start_login(owner=None, size=None):
+    key = _lkey(owner)
+    prev = LOGIN.get(key)
+    if prev and prev["state"] in ("starting", "waiting_login", "captured"):
+        return {"error": "une connexion est déjà ouverte : termine-la ou annule-la d'abord"}
+    if REMOTE_LOGIN and sum(1 for v in LOGIN.values() if v["state"] in ("starting", "waiting_login", "captured")) >= 2:
+        return {"error": "le serveur est occupé par d'autres connexions : réessaie dans une minute"}
+    if not LOGIN_PY.exists() or not LOGIN_SCRIPT.exists():
+        return {"error": "outil de connexion non installé"}
+    d = ACCOUNTS_ROOT / ".login" / re.sub(r"[^a-z0-9_.-]", "_", key)
+    shutil.rmtree(d, ignore_errors=True)
+    d.mkdir(parents=True, exist_ok=True)
+    os.chmod(d, 0o700)
+    # profil et cookies dans un dossier TEMPORAIRE : aucun compte existant n'est touché tant que la connexion n'a pas réussi
+    cmd = [str(LOGIN_PY), str(LOGIN_SCRIPT), "--out", str(d / "cookies.json.new"), "--profile", str(d / ".browser")]
+    w = h = 0
+    if REMOTE_LOGIN:
+        try:
+            w, h = int(size[0]), int(size[1])
+        except (TypeError, ValueError, IndexError):
+            w, h = 420, 600
+        w, h = max(280, min(w, 900)), max(320, min(h, 1200))
+        cmd += ["--remote", "--size", f"{w}x{h}", "--frame", str(d / "frame.jpg")]
+    if os.environ.get("HUB_LOGIN_URL"):
+        cmd += ["--url", os.environ["HUB_LOGIN_URL"]]
+    if os.environ.get("HUB_LOGIN_DOMAINS"):
+        cmd += ["--domains", os.environ["HUB_LOGIN_DOMAINS"]]
+    if os.environ.get("HUB_LOGIN_HEADLESS") == "1":
+        cmd += ["--headless"]
+    info = {"state": "starting", "error": "", "user_id": "", "name": "", "reused": False, "started": NOW(), "proc": None, "owner": owner, "phase": "",
+            "dir": d, "remote": REMOTE_LOGIN, "size": (w, h), "wlock": threading.Lock()}
+    LOGIN[key] = info
+    try:
+        env = {k: v for k, v in os.environ.items() if k in LOGIN_ENV_KEEP}   # le navigateur ne voit ni le mot de passe du hub ni les clés
+        info["proc"] = subprocess.Popen(cmd, stdin=subprocess.PIPE if REMOTE_LOGIN else subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                        stderr=subprocess.DEVNULL, text=True, bufsize=1, env=env)
+    except Exception as ex:
+        info.update(state="error", error=str(ex)[:150])
+        return {"error": info["error"]}
+    threading.Thread(target=_watch_login, args=(info,), daemon=True).start()
+    log("info", "Fenêtre de connexion ouverte" + (" (navigateur distant)" if REMOTE_LOGIN else ""), acct=None)
+    return {"ok": True, "remote": REMOTE_LOGIN, "size": [w, h]}
+
+
+def login_input(owner, b):
+    """Commande de l'utilisateur vers son navigateur distant (clic, texte, touche, défilement) : validée avant d'être transmise."""
+    info = LOGIN.get(_lkey(owner))
+    if not info or not info.get("remote") or info["state"] not in ("starting", "waiting_login"):
+        return {"error": "aucune connexion en cours"}
+    t = b.get("t")
+    if t not in LOGIN_KEYS:
+        return {"error": "commande inconnue"}
+    w, h = info["size"]
+    if t == "click":
+        cmd = {"t": "click", "x": max(0.0, min(float(b["x"]), w)), "y": max(0.0, min(float(b["y"]), h))}
+    elif t == "text":
+        cmd = {"t": "text", "s": "".join(ch for ch in str(b.get("s", ""))[:200] if ch.isprintable())}
+    elif t == "login":
+        em, pw = b.get("email"), b.get("password")
+        if not isinstance(em, str) or not isinstance(pw, str) or not (1 <= len(em) <= 200) or not (1 <= len(pw) <= 256) or "\n" in em or "\r" in em:
+            return {"error": "identifiant ou mot de passe invalide"}
+        cmd = {"t": "login", "email": em, "pass": pw}
+        info["phase"] = "submitted"
+    elif t == "key":
+        if b.get("k") not in ("Enter", "Backspace", "Tab", "Escape", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"):
+            return {"error": "touche non autorisée"}
+        cmd = {"t": "key", "k": b["k"]}
+    else:
+        cmd = {"t": "scroll", "dy": max(-1500.0, min(float(b.get("dy", 0)), 1500.0))}
+    try:
+        with info["wlock"]:
+            info["proc"].stdin.write(json.dumps(cmd) + "\n")   # jamais journalisé : un texte saisi peut être un mot de passe
+            info["proc"].stdin.flush()
+    except (OSError, ValueError, AttributeError):
+        return {"error": "la fenêtre de connexion est fermée"}
+    return {"ok": True}
+
+
+def _watch_login(info):
+    d = info["dir"]
+    for line in info["proc"].stdout:
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if ev.get("phase") in ("submitted", "badcreds", "challenge"):
+            info["phase"] = ev["phase"]
+        if ev.get("state") == "waiting_login":
+            info["state"] = "waiting_login"
+        elif ev.get("state") == "captured":
+            info.update(state="captured", user_id=str(ev.get("user_id") or ""))
+        elif ev.get("state") == "error":
+            info.update(state="error", error=str(ev.get("error"))[:200])
+    info["proc"].wait()
+    if info["state"] == "captured":
+        try:
+            jar = json.loads((d / "cookies.json.new").read_text())
+            info["name"], info["reused"] = connect_account(jar, info.get("owner"))
+            info["state"] = "done"
+        except Exception as ex:
+            info.update(state="error", error=str(ex)[:200] if isinstance(ex, ValueError) else f"ajout du compte impossible : {ex}"[:200])
+    elif info["state"] in ("starting", "waiting_login"):
+        info.update(state="error", error=info["error"] or "connexion interrompue")
+    for _ in range(8):   # profil du navigateur + fichier temporaire : la session n'est gardée que dans le dossier du compte (Chrome peut finir d'écrire après l'arrêt)
+        shutil.rmtree(d, ignore_errors=True)
+        if not d.exists():
+            break
+        time.sleep(1)
+    if info["state"] == "error":
+        log("warn", f"Connexion non terminée : {info['error']}")
+    elif info["state"] == "done":
+        log("info", f"Compte « {info['name']} » {'reconnecté' if info['reused'] else 'ajouté'}")
+
+# ---------------------------------------------------------------- logique des événements
+owner_last = {}      # chat_key -> ts ms du dernier message écrit par le propriétaire (reprise en main)
+llm_sent = {}        # chat_key -> [(texte, ts)] pour ignorer l'écho de nos propres envois
+timers = {}          # chat_key -> (threading.Timer, version)
+versions = {}
+ONE_TO_ONE_KINDS = {1, 7, 10, 13, 15}   # ONE_TO_ONE, TINCAN, CARRIER, TINCAN_DISAPPEARING, ENCRYPTED_OVER_WA_ONE_TO_ONE
+threads_loaded = set()
+LLM_SEM = threading.Semaphore(2)
+fetch_waiters = {}   # (compte, thread) -> {"ev": Event, "count": n}
+BUSY = {"style": False, "import": ""}
+STYLE_BUSY = set()
+
+# Tâches asynchrones visibles dans l'interface (avec progression)
+TASKS = {}
+_TL = threading.local()
+_TASK_SEQ = [0]
+
+
+class task:
+    """Contexte d'une tâche longue : `with task("Libellé", total=12) as t: ... tp(done, detail=...)`.
+    Une tâche imbriquée dans une autre ne crée pas de nouvelle ligne : elle met à jour celle de son parent."""
+    def __init__(self, label, total=0, key="", owner=None):
+        self.label, self.total, self.key, self.id, self.nested = label, total, key, None, False
+        self.owner = owner if owner is not None else cur_name()
+
+    def __enter__(self):
+        stack = getattr(_TL, "stack", None)
+        if stack is None:
+            stack = _TL.stack = []
+        if stack:
+            self.nested, self.id = True, stack[-1]
+        else:
+            with L:
+                _TASK_SEQ[0] += 1
+                self.id = f"t{_TASK_SEQ[0]}"
+                TASKS[self.id] = {"id": self.id, "label": self.label, "detail": "", "done": 0, "total": int(self.total or 0), "state": "running",
+                                  "started": NOW(), "ended": 0, "error": "", "key": self.key, "owner": self.owner}
+        stack.append(self.id)
+        return self
+
+    def __exit__(self, et, ev, tb):
+        _TL.stack.pop()
+        if not self.nested:
+            with L:
+                t = TASKS.get(self.id)
+                if t:
+                    t.update(state="error" if et else "done", ended=NOW(), error=str(ev)[:160] if et else "")
+                    if not et and t["total"]:
+                        t["done"] = t["total"]
+                for k in [k for k, v in TASKS.items() if v["ended"] and NOW() - v["ended"] > 60_000]:
+                    del TASKS[k]
+        return False
+
+
+def tp(done=None, total=None, detail=None):
+    """Met à jour la tâche en cours du fil courant (sans effet s'il n'y en a pas)."""
+    stack = getattr(_TL, "stack", None)
+    if not stack:
+        return
+    t = TASKS.get(stack[-1])
+    if not t:
+        return
+    if total is not None:
+        t["total"] = int(total)
+    if done is not None:
+        t["done"] = int(done)
+    if detail is not None:
+        t["detail"] = str(detail)[:80]
+
+
+def tasks_view():
+    now = NOW()
+    me = cur_name()
+    out = [{k: v for k, v in t.items() if k != "owner"} for t in TASKS.values()
+           if (t["state"] == "running" or now - t["ended"] < 7000) and (not AUTH.enabled or t.get("owner") == me)]
+    for a in ACCOUNTS.values():
+        if a.name not in mine():
+            continue
+        if a.state.get("history") == "enrolling":
+            out.append({"id": "h-" + a.name, "label": "Restauration de l'historique chiffré", "detail": a.label or a.name, "done": 0, "total": 0,
+                        "state": "running", "started": now, "ended": 0, "error": "", "key": "history"})
+    for v in LOGIN.values():
+        if v.get("state") in ("starting", "waiting_login", "captured") and (not AUTH.enabled or v.get("owner") == me):
+            out.append({"id": "login", "label": "Connexion d'un compte Messenger", "detail": ("Saisis tes identifiants dans la fenêtre de connexion" if v.get("remote") else "Termine la connexion dans la fenêtre Chrome") if v["state"] == "waiting_login" else "",
+                        "done": 0, "total": 0, "state": "running", "started": v.get("started") or now, "ended": 0, "error": "", "key": "login"})
+    return sorted(out, key=lambda t: t["started"])
+NOW = lambda: int(time.time() * 1000)
+
+
+def ensure_chat(acct, key, thread, name=None):
+    if not q("SELECT 1 FROM chats WHERE key=?", (key,)):
+        nm, pic = name, ""
+        r = q("SELECT name,pic FROM contacts WHERE account=? AND id=?", (acct.name, thread))
+        if r:
+            nm = nm or r[0]["name"]
+            pic = r[0]["pic"] or ""
+        x("INSERT INTO chats(key,account,name,thread,pic) VALUES(?,?,?,?,?)", (key, acct.name, nm or "", thread, pic))
+
+
+def handle_event(acct, e):
+    t = e.get("type")
+    now_ms = NOW()
+    acct.state["last_event"] = now_ms
+    if t == "message" and not e.get("history"):
+        acct.state["last_message"] = now_ms
+        acct.state["last_message_route"] = "chiffré" if e.get("e2ee") else "classique"
+    if t == "status":
+        s = e.get("state")
+        if s in ("connected", "reconnected", "disconnected", "e2ee_connected", "e2ee_disconnected"):
+            log("info", f"[{acct.name}] canal {'chiffré' if s.startswith('e2ee') else 'classique'} : {s.replace('e2ee_', '')}")
+        if s == "connected" or s == "reconnected":
+            acct.state["classic"] = True
+            if acct.name not in threads_loaded:
+                threads_loaded.add(acct.name)
+                threading.Timer(5, lambda: acct.send({"op": "threads"})).start()
+        elif s == "disconnected":
+            acct.state["classic"] = False
+        elif s == "e2ee_connected":
+            acct.state["e2ee"] = True
+            acct.send({"op": "history_status"})
+        elif s == "e2ee_disconnected":
+            acct.state["e2ee"] = False
+        elif s == "e2ee_unhandled":
+            log("warn", f"[{acct.name}] message chiffré d'un type non géré : {str(e.get('detail'))[:80]}")
+        elif s == "e2ee_not_registered":
+            acct.state["note"] = "canal chiffré non enregistré"
+        elif s == "fatal":
+            log("error", f"[{acct.name}] erreur fatale du client: {e.get('error')}")
+    elif t == "self":
+        label = re.sub(r"[\x00-\x1f\x7f]", "", str(e.get("name") or "")).strip()[:60]
+        if label and label != acct.label:
+            acct.label = label
+            save_accounts()
+    elif t == "contact":
+        pic = e.get("pic") or ""
+        x("INSERT INTO contacts(account,id,name,pic) VALUES(?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET "
+          "name=excluded.name, pic=CASE WHEN excluded.pic<>'' THEN excluded.pic ELSE contacts.pic END",
+          (acct.name, e["id"], e["name"], pic))
+        ckey = f"{acct.name}:{e['id']}"
