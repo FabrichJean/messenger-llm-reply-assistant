@@ -2602,7 +2602,8 @@ def _run_reply(key, ver, ty):
         alert = reply.upper().startswith("[ALERTE]")
         if alert:
             reply = reply[8:].strip()
-            x("UPDATE chats SET attention=1, attention_note=? WHERE key=?", ("⚠ situation grave signalée (urgence, danger ou détresse) : réponds-lui toi-même dès que possible", key))
+            alert_note = "⚠ situation grave signalée (urgence, danger ou détresse) : réponds-lui toi-même dès que possible"
+            x("UPDATE chats SET attention=1, attention_note=? WHERE key=?", (alert_note, key))
             log("warn", "Situation grave signalée par le contact : message d'empathie envoyé, à toi de prendre le relais", key)
         skip, why = split_skip(reply)
         is_attack = reply.upper().startswith("[ATTAQUE]") or (skip and security.looks_like_attack(why))
@@ -2634,6 +2635,8 @@ def _run_reply(key, ver, ty):
             return
         ty.stop()
         send_text(key, reply, "llm", auto=True)
+        if alert:   # l'enregistrement du message envoyé remet « à traiter » à zéro : on le réapplique pour que le propriétaire soit bien alerté
+            x("UPDATE chats SET attention=1, attention_note=? WHERE key=?", (alert_note, key))
         threading.Thread(target=_bg_memory, args=(key,), daemon=True).start()
 
 
