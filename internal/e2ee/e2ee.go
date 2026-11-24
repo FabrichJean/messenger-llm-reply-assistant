@@ -1,4 +1,4 @@
-package main
+package e2ee
 
 // Canal chiffré de bout en bout (E2EE) : notre client a son propre « appareil »
 // (clés stockées dans un SQLite local). L'enregistrement de cet appareil modifie
@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"messenger-lite/internal/attachments"
 	"os"
 	"strconv"
 
@@ -25,17 +26,17 @@ import (
 )
 
 // e2eeDevice : appareil chiffré de ce client (utile pour la restauration de l'historique).
-var e2eeDevice *store.Device
+var Device *store.Device
 
 // e2eeIncoming est appelé pour chaque message chiffré déchiffré.
-type e2eeIncoming func(chat waTypes.JID, id string, sender waTypes.JID, fromMe bool, text string, tsMs int64)
+type Incoming func(chat waTypes.JID, id string, sender waTypes.JID, fromMe bool, text string, tsMs int64)
 
 // startE2EE ouvre le store de clés, (optionnellement) enregistre l'appareil, puis se connecte.
 // Retourne (nil, nil) si aucun appareil n'est enregistré et que register est faux.
-func startE2EE(ctx context.Context, client *messagix.Client, selfID int64, dbPath string, register bool,
-	onMsg e2eeIncoming, onStatus func(state string, detail any),
+func StartE2EE(ctx context.Context, client *messagix.Client, selfID int64, dbPath string, register bool,
+	onMsg Incoming, onStatus func(state string, detail any),
 	onEdit func(chat waTypes.JID, id, text string, tsMs int64), onDelete func(chat waTypes.JID, id string),
-	onAtts func(chat waTypes.JID, id string, atts []attachment, tsMs int64)) (*whatsmeow.Client, error) {
+	onAtts func(chat waTypes.JID, id string, atts []attachments.Attachment, tsMs int64)) (*whatsmeow.Client, error) {
 
 	db, err := sql.Open("sqlite3", "file:"+dbPath+"?_foreign_keys=on&_busy_timeout=5000")
 	if err != nil {
@@ -58,7 +59,7 @@ func startE2EE(ctx context.Context, client *messagix.Client, selfID int64, dbPat
 		return nil, nil
 	}
 	client.SetDevice(dev)
-	e2eeDevice = dev
+	Device = dev
 	if isNew {
 		if err = client.RegisterE2EE(ctx, selfID); err != nil {
 			return nil, fmt.Errorf("enregistrement de l'appareil: %w", err)
@@ -85,14 +86,14 @@ func startE2EE(ctx context.Context, client *messagix.Client, selfID int64, dbPat
 				onDelete(evt.Info.Chat, rev.GetKey().GetID())
 				return
 			}
-			text := e2eeText(app)
+			text := attachments.E2EEText(app)
 			thread, _ := strconv.ParseInt(evt.Info.Chat.User, 10, 64)
-			atts := e2eeAttachments(app, thread, evt.Info.Chat.String(), evt.Info.ID)
+			atts := attachments.E2EEAttachments(app, thread, evt.Info.Chat.String(), evt.Info.ID)
 			if arm := evt.GetArmadillo(); arm != nil { // messages enrichis : posts / reels / liens partagés, galeries, éphémères
 				if text == "" {
-					text = armadilloText(arm)
+					text = attachments.ArmadilloText(arm)
 				}
-				atts = append(atts, armadilloAttachments(arm, thread, evt.Info.Chat.String(), evt.Info.ID)...)
+				atts = append(atts, attachments.ArmadilloAttachments(arm, thread, evt.Info.Chat.String(), evt.Info.ID)...)
 				if len(atts) == 0 && text == "" {
 					onStatus("e2ee_unhandled", fmt.Sprintf("%T", arm.GetPayload().GetContent().GetContent()))
 				}
@@ -118,7 +119,7 @@ func startE2EE(ctx context.Context, client *messagix.Client, selfID int64, dbPat
 }
 
 // chatJID construit l'identifiant d'un chat chiffré 1:1 à partir de l'identifiant Facebook.
-func chatJID(thread int64, chat string) (waTypes.JID, error) {
+func ChatJID(thread int64, chat string) (waTypes.JID, error) {
 	if chat != "" {
 		return waTypes.ParseJID(chat)
 	}
@@ -126,7 +127,7 @@ func chatJID(thread int64, chat string) (waTypes.JID, error) {
 }
 
 // sendE2EEText envoie un message texte chiffré.
-func sendE2EEText(ctx context.Context, cli *whatsmeow.Client, to waTypes.JID, text string, otid int64) error {
+func SendE2EEText(ctx context.Context, cli *whatsmeow.Client, to waTypes.JID, text string, otid int64) error {
 	msg := &waConsumerApplication.ConsumerApplication{
 		Payload: &waConsumerApplication.ConsumerApplication_Payload{
 			Payload: &waConsumerApplication.ConsumerApplication_Payload_Content{

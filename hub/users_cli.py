@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import auth  # noqa: E402
+from relais import auth  # noqa: E402
 
 DATA = Path(os.environ.get("HUB_DATA", Path(__file__).resolve().parent))
 os.umask(0o077)

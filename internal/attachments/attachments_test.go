@@ -1,4 +1,4 @@
-package main
+package attachments
 
 import (
 	"encoding/base64"
@@ -38,10 +38,10 @@ func TestE2EEImage(t *testing.T) {
 	}
 	app := appWith(&waConsumerApplication.ConsumerApplication_Content{Content: &waConsumerApplication.ConsumerApplication_Content_ImageMessage{
 		ImageMessage: &waConsumerApplication.ConsumerApplication_ImageMessage{Image: sp(img), Caption: &waCommon.MessageText{Text: proto.String("regarde")}}}})
-	if got := e2eeText(app); got != "regarde" {
+	if got := E2EEText(app); got != "regarde" {
 		t.Fatalf("légende: %q", got)
 	}
-	atts := e2eeAttachments(app, 42, "42@msgr", "mid1")
+	atts := E2EEAttachments(app, 42, "42@msgr", "mid1")
 	if len(atts) != 1 || atts[0]["kind"] != "image" || atts[0]["mtype"] != "image" || atts[0]["w"] != int64(640) || atts[0]["size"] != int64(1234) {
 		t.Fatalf("image: %+v", atts)
 	}
@@ -59,27 +59,27 @@ func TestE2EEGifDocStickerAudio(t *testing.T) {
 	}
 	app := appWith(&waConsumerApplication.ConsumerApplication_Content{Content: &waConsumerApplication.ConsumerApplication_Content_VideoMessage{
 		VideoMessage: &waConsumerApplication.ConsumerApplication_VideoMessage{Video: sp(vid)}}})
-	a := e2eeAttachments(app, 1, "1@msgr", "m")
+	a := E2EEAttachments(app, 1, "1@msgr", "m")
 	if len(a) != 1 || a[0]["kind"] != "gif" || a[0]["mtype"] != "video" || a[0]["dur"] != int64(3000) {
 		t.Fatalf("gif: %+v", a)
 	}
 	doc := &waMediaTransport.DocumentTransport{Integral: &waMediaTransport.DocumentTransport_Integral{Transport: transport("/v/d", "application/pdf", 5)}}
 	app = appWith(&waConsumerApplication.ConsumerApplication_Content{Content: &waConsumerApplication.ConsumerApplication_Content_DocumentMessage{
 		DocumentMessage: &waConsumerApplication.ConsumerApplication_DocumentMessage{Document: sp(doc), FileName: proto.String("facture.pdf")}}})
-	a = e2eeAttachments(app, 1, "1@msgr", "m")
+	a = E2EEAttachments(app, 1, "1@msgr", "m")
 	if len(a) != 1 || a[0]["kind"] != "file" || a[0]["name"] != "facture.pdf" || a[0]["mtype"] != "document" || a[0]["mime"] != "application/pdf" {
 		t.Fatalf("doc: %+v", a)
 	}
 	st := &waMediaTransport.StickerTransport{Integral: &waMediaTransport.StickerTransport_Integral{Transport: transport("/v/s", "image/webp", 7)}}
 	app = appWith(&waConsumerApplication.ConsumerApplication_Content{Content: &waConsumerApplication.ConsumerApplication_Content_StickerMessage{
 		StickerMessage: &waConsumerApplication.ConsumerApplication_StickerMessage{Sticker: sp(st)}}})
-	if a = e2eeAttachments(app, 1, "1@msgr", "m"); len(a) != 1 || a[0]["kind"] != "sticker" {
+	if a = E2EEAttachments(app, 1, "1@msgr", "m"); len(a) != 1 || a[0]["kind"] != "sticker" {
 		t.Fatalf("sticker: %+v", a)
 	}
 	au := &waMediaTransport.AudioTransport{Integral: &waMediaTransport.AudioTransport_Integral{Transport: transport("/v/a", "audio/ogg", 7)}}
 	app = appWith(&waConsumerApplication.ConsumerApplication_Content{Content: &waConsumerApplication.ConsumerApplication_Content_AudioMessage{
 		AudioMessage: &waConsumerApplication.ConsumerApplication_AudioMessage{Audio: sp(au)}}})
-	if a = e2eeAttachments(app, 1, "1@msgr", "m"); len(a) != 1 || a[0]["kind"] != "audio" {
+	if a = E2EEAttachments(app, 1, "1@msgr", "m"); len(a) != 1 || a[0]["kind"] != "audio" {
 		t.Fatalf("audio: %+v", a)
 	}
 }
@@ -89,21 +89,21 @@ func TestE2EELinkAndLocation(t *testing.T) {
 		ExtendedTextMessage: &waConsumerApplication.ConsumerApplication_ExtendedTextMessage{
 			Text: &waCommon.MessageText{Text: proto.String("lis ça https://exemple.fr/a")}, CanonicalURL: proto.String("https://exemple.fr/a"),
 			Title: proto.String("Un titre"), Description: proto.String("Une description")}}})
-	if got := e2eeText(app); got != "lis ça https://exemple.fr/a" {
+	if got := E2EEText(app); got != "lis ça https://exemple.fr/a" {
 		t.Fatalf("texte lien: %q", got)
 	}
-	a := e2eeAttachments(app, 1, "1@msgr", "m")
+	a := E2EEAttachments(app, 1, "1@msgr", "m")
 	if len(a) != 1 || a[0]["kind"] != "link" || a[0]["action"] != "https://exemple.fr/a" || a[0]["title"] != "Un titre" {
 		t.Fatalf("lien: %+v", a)
 	}
 	loc := appWith(&waConsumerApplication.ConsumerApplication_Content{Content: &waConsumerApplication.ConsumerApplication_Content_LocationMessage{
 		LocationMessage: &waConsumerApplication.ConsumerApplication_LocationMessage{Location: &waConsumerApplication.ConsumerApplication_Location{
 			DegreesLatitude: proto.Float64(48.85), DegreesLongitude: proto.Float64(2.35), Name: proto.String("Paris")}}}})
-	a = e2eeAttachments(loc, 1, "1@msgr", "m")
+	a = E2EEAttachments(loc, 1, "1@msgr", "m")
 	if len(a) != 1 || a[0]["kind"] != "location" || a[0]["title"] != "Paris" {
 		t.Fatalf("position: %+v", a)
 	}
-	if got := e2eeAttachments(appWith(&waConsumerApplication.ConsumerApplication_Content{}), 1, "x", "m"); len(got) != 0 {
+	if got := E2EEAttachments(appWith(&waConsumerApplication.ConsumerApplication_Content{}), 1, "x", "m"); len(got) != 0 {
 		t.Fatalf("vide: %+v", got)
 	}
 }
@@ -119,7 +119,7 @@ func TestClassic(t *testing.T) {
 		LSInsertStickerAttachment: []*table.LSInsertStickerAttachment{{ThreadKey: 5, MessageId: "m5", PlayableUrl: "https://scontent.fbcdn.net/s.webp"}},
 		LSInsertXmaAttachment:     []*table.LSInsertXmaAttachment{{ThreadKey: 5, MessageId: "m6", AttachmentType: table.AttachmentTypeXMA, ActionUrl: "https://exemple.fr", TitleText: "T", ImageUrl: "https://external.fbcdn.net/i.jpg"}},
 	}
-	got := classicAttachments(tb)
+	got := ClassicAttachments(tb)
 	want := map[string]string{"m1": "image", "m2": "gif", "m3": "file", "m4": "audio", "m5": "sticker", "m6": "link"}
 	if len(got) != len(want) {
 		t.Fatalf("nombre: %d", len(got))
@@ -133,7 +133,7 @@ func TestClassic(t *testing.T) {
 		t.Errorf("image: %+v", got[0])
 	}
 	// message sans identifiant ou fil : ignoré
-	if n := len(classicAttachments(&table.LSTable{LSInsertBlobAttachment: []*table.LSInsertBlobAttachment{{MessageId: "x"}}})); n != 0 {
+	if n := len(ClassicAttachments(&table.LSTable{LSInsertBlobAttachment: []*table.LSInsertBlobAttachment{{MessageId: "x"}}})); n != 0 {
 		t.Errorf("sans fil: %d", n)
 	}
 }
@@ -154,10 +154,10 @@ func TestArmadilloSharedPost(t *testing.T) {
 				},
 				Previews: []*waCommon.SubProtocol{sp(prev)},
 			}}}}}}
-	if armadilloText(arm) != "regarde ça" {
-		t.Fatalf("texte: %q", armadilloText(arm))
+	if ArmadilloText(arm) != "regarde ça" {
+		t.Fatalf("texte: %q", ArmadilloText(arm))
 	}
-	a := armadilloAttachments(arm, 7, "7@msgr", "m")
+	a := ArmadilloAttachments(arm, 7, "7@msgr", "m")
 	if len(a) != 1 || a[0]["kind"] != "link" || a[0]["title"] != "Un post" || a[0]["action"] != "https://www.facebook.com/share/p/abc/" ||
 		a[0]["mtype"] != "xmapreview" || a[0]["blob"] == "" || a[0]["w"] != int64(720) {
 		t.Fatalf("post partagé: %+v", a)
@@ -167,7 +167,7 @@ func TestArmadilloSharedPost(t *testing.T) {
 		Payload: &waArmadilloApplication.Armadillo_Payload_Content{Content: &waArmadilloApplication.Armadillo_Content{
 			Content: &waArmadilloApplication.Armadillo_Content_ImageGalleryMessage_{ImageGalleryMessage: &waArmadilloApplication.Armadillo_Content_ImageGalleryMessage{
 				Images: []*waCommon.SubProtocol{sp(prev), sp(prev)}}}}}}}
-	if g := armadilloAttachments(gal, 7, "7@msgr", "m"); len(g) != 2 || g[1]["idx"] != int64(1) || g[0]["kind"] != "image" {
+	if g := ArmadilloAttachments(gal, 7, "7@msgr", "m"); len(g) != 2 || g[1]["idx"] != int64(1) || g[0]["kind"] != "image" {
 		t.Fatalf("galerie: %+v", g)
 	}
 }

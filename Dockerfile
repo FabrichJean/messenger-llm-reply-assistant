@@ -5,8 +5,9 @@ FROM golang:${GO_VERSION}-bookworm AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
-COPY *.go ./
-RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/messenger-lite .
+COPY cmd/ ./cmd/
+COPY internal/ ./internal/
+RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/messenger-lite ./cmd/messenger-lite
 
 # --- 2) image d'exécution : hub Python + Claude CLI + client ----------------------------------------------
 FROM python:3.12-slim-bookworm
