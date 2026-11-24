@@ -25,3 +25,30 @@ main{width:min(400px,calc(100vw - 32px));padding:32px;border-radius:28px;backgro
 p{color:var(--muted);margin:0 0 20px;font-size:14px}
 label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:500}
 input{width:100%;padding:13px 16px;border-radius:14px;border:1px solid var(--line);background:var(--field);color:var(--text);font:inherit}
+input:focus-visible{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+button{width:100%;margin-top:16px;padding:14px;border:0;border-radius:999px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font:inherit;font-weight:600;cursor:pointer;box-shadow:0 12px 30px -14px var(--accent)}
+button:hover{background:linear-gradient(135deg,var(--accent-hover),var(--accent))}button:disabled{opacity:.6;cursor:wait}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+#err{min-height:20px;margin-top:12px;color:var(--bad);font-size:13px}
+a{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <div class="logo"><svg width="34" height="34" viewBox="0 0 44 44"><rect x="3.5" y="4" width="24" height="21" rx="8" fill="none" stroke="currentColor" stroke-width="4"/><rect x="16.5" y="19" width="24" height="21" rx="8" fill="none" stroke="currentColor" stroke-width="4" opacity=".75"/></svg>Relais</div>
+  <p>Accès protégé. Connecte-toi avec ton identifiant.</p>
+  <form id="f"><label for="u">Identifiant</label><input id="u" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required style="margin-bottom:14px"><label for="p">Mot de passe</label><input id="p" type="password" autocomplete="current-password" required>
+  <button id="b" type="submit">Se connecter</button><div id="err" role="alert"></div></form>
+  <p style="margin:14px 0 0;text-align:center"><a href="/" style="color:var(--muted);font-size:13px;text-decoration:none">← Retour à l'accueil</a></p>
+</main>
+<script>
+document.getElementById('f').onsubmit=async e=>{
+  e.preventDefault();const b=document.getElementById('b'),er=document.getElementById('err');b.disabled=true;er.textContent='';
+  try{
+    const r=await fetch('/api/login',{method:'POST',headers:{'X-Hub':'1','Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('u').value,password:document.getElementById('p').value})});
+    const d=await r.json();
+    if(d.ok)location.href='/';else{er.textContent=d.error||'Identifiant ou mot de passe incorrect.';b.disabled=false}
+  }catch(x){er.textContent='Connexion impossible.';b.disabled=false}
+};
+</script>
+</body></html>
