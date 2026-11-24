@@ -30,3 +30,34 @@ button{width:100%;margin-top:16px;padding:14px;border:0;border-radius:999px;back
 button:hover{background:linear-gradient(135deg,var(--accent-hover),var(--accent))}button:disabled{opacity:.6;cursor:wait}
 .hint{font-size:12px;color:var(--muted);margin-top:6px}
 #err{min-height:20px;margin-top:12px;color:var(--bad);font-size:13px}
+a{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <div class="logo"><svg width="34" height="34" viewBox="0 0 44 44"><rect x="3.5" y="4" width="24" height="21" rx="8" fill="none" stroke="currentColor" stroke-width="4"/><rect x="16.5" y="19" width="24" height="21" rx="8" fill="none" stroke="currentColor" stroke-width="4" opacity=".75"/></svg>Relais</div>
+  <p>Tu as été invité(e). Choisis ton identifiant et ton mot de passe pour créer ton espace.</p>
+  <form id="f"><label for="u">Identifiant</label><input id="u" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="32" autofocus required style="margin-bottom:6px">
+  <div class="hint">2 à 32 caractères : minuscules, chiffres, . _ -</div>
+  <label for="p" style="margin-top:14px">Mot de passe</label><input id="p" type="password" autocomplete="new-password" minlength="12" required>
+  <div class="hint">12 caractères minimum.</div>
+  <label for="p2" style="margin-top:14px">Confirme le mot de passe</label><input id="p2" type="password" autocomplete="new-password" required>
+  <button id="b" type="submit">Créer mon compte</button><div id="err" role="alert"></div></form>
+</main>
+<script>
+const TOKEN=decodeURIComponent((location.hash||'').slice(1));
+try{history.replaceState(null,'',location.pathname)}catch(e){}   // le jeton quitte la barre d'adresse et l'historique
+document.getElementById('f').onsubmit=async e=>{
+  e.preventDefault();const b=document.getElementById('b'),er=document.getElementById('err');er.textContent='';
+  const u=document.getElementById('u').value,p=document.getElementById('p').value;
+  if(!TOKEN){er.textContent="Lien d'invitation incomplet : ouvre-le en entier.";return}
+  if(p!==document.getElementById('p2').value){er.textContent='Les deux mots de passe diffèrent.';return}
+  b.disabled=true;
+  try{
+    const r=await fetch('/api/join',{method:'POST',headers:{'X-Hub':'1','Content-Type':'application/json'},body:JSON.stringify({token:TOKEN,username:u,password:p})});
+    const d=await r.json();
+    if(d.ok)location.href='/';else{er.textContent=d.error||'Inscription impossible.';b.disabled=false}
+  }catch(x){er.textContent='Connexion impossible.';b.disabled=false}
+};
+</script>
+</body></html>
