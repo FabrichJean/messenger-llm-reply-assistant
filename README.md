@@ -110,6 +110,7 @@ Le hub n'écoute que sur `127.0.0.1` du serveur : ouvre-le par un tunnel SSH (`s
 go build -o messenger-lite .        # client Messenger (Go, CGO requis pour SQLite)
 python3 hub/hub.py                  # hub sur http://127.0.0.1:8787
 go test ./...                       # tests du client
+tests/run.sh                        # tous les tests (client Go + hub de bout en bout)
 ```
 
 Aucun compte n'existe au départ : tu les ajoutes depuis l'interface. Les secrets (cookies, clés chiffrées, base de données) vivent dans `accounts/` et dans le dossier de données du hub, tous deux exclus de git.
@@ -144,12 +145,24 @@ La connexion Messenger se fait dans l'application, sur `messenger.com`. Le mot d
 ```
 .
 ├── main.go, e2ee.go, history.go, attachments.go   Client Messenger (Go)
-├── hub/                                           Hub web : hub.py, auth.py, memory.py, humanize.py, security.py, interface HTML
-├── mobile/                                        Application Android (WebView)
-├── extension/                                     Extension « Relais Connect »
-├── deploy/                                        Guide VPS, Caddy, sauvegardes, envoi de comptes
-├── Dockerfile, docker-compose.yml                 Déploiement
-└── MULTIUSER.md                                   Conception multi-utilisateurs
+├── hub/
+│   ├── hub.py                    Lanceur du hub (quelques lignes)
+│   ├── relais/                   Code du hub, en couches
+│   │   ├── config.py db.py context.py tls.py        Configuration, base SQLite, contexte de la requête
+│   │   ├── auth.py security.py media.py             Utilisateurs et sessions, défenses, types de médias
+│   │   ├── accounts.py login.py                     Comptes Messenger, connexion (extension, cookies)
+│   │   ├── events.py attachments.py previews.py     Événements entrants, pièces jointes, aperçus de liens
+│   │   ├── sync.py tasks.py                         Synchronisation de l'historique, tâches de fond
+│   │   ├── llm/                                     Prompts, réponses, mémoire, style, humanisation, garde-fous
+│   │   └── web/                                     Serveur HTTP, routes de l'API, utilisateurs
+│   ├── users_cli.py adopt_account.py                Outils en ligne de commande
+│   └── index.html login.html join.html              Interface web
+├── mobile/                                          Application Android (WebView)
+├── extension/                                       Extension « Relais Connect »
+├── deploy/                                          Guide VPS, Caddy, sauvegardes, envoi de comptes
+├── tests/                                           Tests (voir tests/README.md) : `tests/run.sh`
+├── Dockerfile, docker-compose.yml                   Déploiement
+└── MULTIUSER.md                                     Conception multi-utilisateurs
 ```
 
 `main` regroupe tout ; les branches `feature/*` isolent chaque thème (`go-client`, `hub-core`, `hub-auth`, `hub-llm`, `android-app`, `extension`, `deploy`) et `chore/repo-meta` porte la configuration du dépôt.
