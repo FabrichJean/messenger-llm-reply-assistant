@@ -1,0 +1,27 @@
+# Relais / Messenger Lite Hub : déploiement sur un VPS.
+#   1) cp deploy/.env.example .env  puis édite-le (HUB_PASSWORD obligatoire)
+#   2) docker compose up -d --build                        # accès par tunnel SSH : http://localhost:8787
+#   3) COMPOSE_PROFILES=https docker compose up -d --build  # accès par https://$DOMAIN (Caddy, certificat automatique)
+# Voir deploy/README.md.
+services:
+  hub:
+    build: .
+    image: relais-hub:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+      HUB_ALLOWED_HOSTS: ${DOMAIN:-}
+      HUB_TRUST_PROXY: ${HUB_TRUST_PROXY:-0}
+      HUB_SECURE_COOKIE: ${HUB_SECURE_COOKIE:-0}
+    volumes:
+      - hub-data:/data        # base, comptes (cookies, clés chiffrées), pièces jointes en cache
+      - hub-home:/home/hub    # connexion de Claude (claude login) et sa configuration
+    ports:
+      - "127.0.0.1:${HUB_HOST_PORT:-8787}:8787" # jamais exposé directement : tunnel SSH, Caddy ou nginx existant
+    mem_limit: 1536m
+    cpus: 1.5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
