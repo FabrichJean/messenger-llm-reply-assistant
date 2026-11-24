@@ -3017,3 +3017,278 @@ def _post(path, b):
     if path == "/api/accounts/login/input":
         return login_input(cur_name(), b)
     if path == "/api/accounts/login/cancel":
+        info = LOGIN.get(_lkey(cur_name()))
+        if info and info["proc"] and info["proc"].poll() is None:
+            info["state"] = "cancelled"
+            info["proc"].terminate()
+        return {"ok": True}
+    if path == "/api/accounts/import_curl":
+        jar = parse_curl_cookies(str(b.get("curl") or ""))
+        if not jar:
+            return {"error": "cookies introuvables : colle une requête « Copy as cURL » faite sur messenger.com une fois connecté"}
+        try:
+            name, reused = connect_account(jar, cur_name())
+        except ValueError as ex:
+            return {"error": str(ex)}
+        return {"ok": True, "name": name, "reused": reused}
+    if path == "/api/accounts/register_e2ee":
+        acct = ACCOUNTS.get(b.get("name"))
+        if not acct:
+            return {"error": "compte inconnu"}
+        if not b.get("confirm"):
+            return {"error": "confirmation requise : cette action ajoute un appareil chiffré sur le compte Messenger"}
+        if has_registered_device(acct.dir):
+            return {"error": "un appareil chiffré existe déjà pour ce compte : aucun nouvel enregistrement n'est nécessaire"}
+        acct.args = ["-register-e2ee"]
+        if acct.proc and acct.proc.poll() is None:
+            acct.proc.terminate()   # la boucle relance le client avec l'enregistrement (une seule fois)
+        log("info", f"[{acct.name}] enregistrement de l'appareil chiffré demandé")
+        return {"ok": True}
+    if path == "/api/accounts/remove":
+        name = b.get("name")
+        if name not in ACCOUNTS:
+            return {"error": "compte inconnu"}
+        if not b.get("confirm"):
+            return {"error": "confirmation requise"}
+        for k in [k for k in timers if acct_of(k) == name]:
+            cancel_timer(k)
+        ACCOUNTS[name].shutdown()
+        del ACCOUNTS[name]
+        save_accounts()
+        log("info", f"Compte « {name} » retiré (ses fichiers sont conservés sur le disque)")
+        return {"ok": True}
+    if path == "/api/threads/load":
+        return {"ok": all([a.send({"op": "threads"}) for a in ACCOUNTS.values() if a.name in mine()])}
+    if path == "/api/style/analyze":
+        if b.get("account") and b["account"] not in ACCOUNTS:
+            return {"error": "compte inconnu"}
+        threading.Thread(target=analyze_style, args=(b.get("account"),), daemon=True).start()
+        return {"ok": True}
+    if path == "/api/style/learn":
+        if b.get("account") and b["account"] not in ACCOUNTS:
+            return {"error": "compte inconnu"}
+        return {"ok": run_bg("learn", learn_all, b.get("account"))}
+    if path == "/api/clear_attention":
+        x("UPDATE chats SET attention=0, attention_note='' WHERE key=?", (b["key"],))
+        return {"ok": True}
+    return {"error": "route inconnue"}
+
+
+KEY_ROUTES = {"/api/send", "/api/chat/import", "/api/chat/prepare", "/api/chat/prepare/discard", "/api/message/edit", "/api/chat/sync", "/api/chat/raise_limit",
+              "/api/chat/unmute", "/api/chat/preview", "/api/chat/send_preview", "/api/chat/force", "/api/chat/pin", "/api/chat/delete", "/api/chat/rename",
+              "/api/clear_attention", "/api/chat/settings", "/api/chat/memory/refresh"}
+ACCT_ROUTES = {"/api/settings/reset": "account", "/api/accounts/register_e2ee": "name", "/api/accounts/remove": "name"}
+DEFAULT_ACCT_ROUTES = {"/api/chat/add", "/api/history/enroll", "/api/style/analyze", "/api/style/learn"}
+
+
+def post(path, b):
+    """Point d'entrée des actions : vérifie que l'utilisateur possède bien ce qu'il touche, puis exécute."""
+    if path.startswith("/api/users") or path == "/api/me/password":
+        return users_api(path, b)
+    if AUTH.enabled:
+        if not isinstance(b, dict):
+            return {"error": "requête invalide"}
+        if path in KEY_ROUTES:
+            if not own_chat(b.get("key")):
+                return {"error": "conversation inconnue"}
+        elif path == "/api/draft":
+            d = q("SELECT chat_key FROM drafts WHERE id=?", (b.get("id"),))
+            if not d or not own_chat(d[0]["chat_key"]):
+                return {"error": "brouillon introuvable"}
+        elif path in ACCT_ROUTES:
+            n = b.get(ACCT_ROUTES[path])
+            if not isinstance(n, str) or n not in mine():
+                return {"error": "compte inconnu"}
+        elif path in DEFAULT_ACCT_ROUTES:
+            n = b.get("account") or next(iter(sorted(mine())), None)
+            if not isinstance(n, str) or n not in mine():
+                return {"error": "compte inconnu"}
+            b = dict(b)
+            b["account"] = n
+        elif path == "/api/settings":
+            sc = b.get("account") or None
+            if sc:
+                if not isinstance(sc, str) or sc not in mine():
+                    return {"error": "compte inconnu"}
+            elif not is_admin():   # pas de réglages « généraux » pour un utilisateur : on les applique à chacun de SES comptes
+                for n in sorted(mine()):
+                    _post(path, {**b, "account": n})
+                return {"ok": True}
+    return _post(path, b)
+
+
+def users_api(path, b):
+    me = cur()
+    if not isinstance(b, dict):
+        return {"error": "requête invalide"}
+    if path == "/api/me/password":
+        if not AUTH.enabled or not me:
+            return {"error": "l'authentification n'est pas activée"}
+        try:
+            AUTH.change_password(me["name"], b.get("old"), b.get("new"))
+        except ValueError as ex:
+            return {"error": str(ex)}
+        log("info", f"Mot de passe modifié par « {clean(me['name'])} » (toutes ses sessions sont fermées)")
+        return {"ok": True}
+    if not AUTH.enabled or not is_admin():
+        return {"error": "réservé à l'administrateur"}
+    if path == "/api/users/invite":
+        try:
+            tok, exp = AUTH.create_invite(me["name"])
+        except ValueError as ex:
+            return {"error": str(ex)}
+        log("info", f"Invitation créée par « {clean(me['name'])} » (valable 48 h, usage unique)")
+        return {"ok": True, "path": "/join#" + tok, "exp": exp}
+    if path == "/api/users/invite_revoke":
+        try:
+            AUTH.revoke_invite(b.get("id"))
+        except ValueError as ex:
+            return {"error": str(ex)}
+        return {"ok": True}
+    if path == "/api/users/list":
+        owned = {}
+        for a in ACCOUNTS.values():
+            owned.setdefault(a.owner, []).append(a.label or a.name)
+        return {"users": [{**u, "accounts": owned.get(u["name"], [])} for u in AUTH.list_users()], "invites": AUTH.list_invites(),
+                "unowned": [a.label or a.name for a in ACCOUNTS.values() if not a.owner or not AUTH.exists(a.owner)]}
+    try:
+        if path == "/api/users/create":
+            AUTH.create_user(b.get("name"), b.get("password"), "admin" if b.get("role") == "admin" else "user")
+            log("info", f"Utilisateur « {clean(b.get('name'))} » créé par « {clean(me['name'])} »")
+            return {"ok": True}
+        name = b.get("name")
+        if not isinstance(name, str) or not AUTH.exists(name):
+            return {"error": "utilisateur inconnu"}
+        if path == "/api/users/reset":
+            AUTH.set_password(name, b.get("password"))
+            log("info", f"Mot de passe de « {clean(name)} » réinitialisé par « {clean(me['name'])} »")
+            return {"ok": True}
+        if path == "/api/users/delete":
+            if name == me["name"]:
+                return {"error": "tu ne peux pas supprimer ton propre compte"}
+            owned = [a.name for a in ACCOUNTS.values() if a.owner == name]
+            if owned and not b.get("remove_accounts"):
+                return {"error": f"cet utilisateur possède {len(owned)} compte(s) Messenger : confirme leur retrait du hub (les fichiers sont conservés sur le disque)"}
+            if not b.get("confirm"):
+                return {"error": "confirmation requise"}
+            AUTH.delete_user(name)
+            for n in owned:
+                for k in [k for k in timers if acct_of(k) == n]:
+                    cancel_timer(k)
+                ACCOUNTS[n].shutdown()
+                del ACCOUNTS[n]
+            if owned:
+                save_accounts()
+            log("info", f"Utilisateur « {clean(name)} » supprimé par « {clean(me['name'])} » ({len(owned)} compte(s) retiré(s) du hub)")
+            return {"ok": True}
+        if path == "/api/users/assign":
+            acct = ACCOUNTS.get(b.get("account"))
+            if not acct:
+                return {"error": "compte inconnu"}
+            acct.owner = name
+            save_accounts()
+            log("info", f"Compte « {clean(acct.name)} » attribué à « {clean(name)} » par « {clean(me['name'])} »")
+            return {"ok": True}
+    except ValueError as ex:
+        return {"error": str(ex)}
+    return {"error": "route inconnue"}
+
+
+AVATAR_HOSTS = (".fbcdn.net", ".facebook.com", ".fbsbx.com")
+
+
+def make_ssl_context():
+    """Vérification TLS stricte ; si Python n'a pas de certificats racine, on prend ceux du système."""
+    ctx = ssl.create_default_context()
+    if ctx.cert_store_stats().get("x509_ca", 0) == 0:
+        for cafile in ("/etc/ssl/cert.pem", "/etc/ssl/certs/ca-certificates.crt", "/etc/pki/tls/certs/ca-bundle.crt"):
+            if os.path.exists(cafile):
+                ctx.load_verify_locations(cafile)
+                break
+    return ctx
+
+
+SSL_CTX = make_ssl_context()
+
+
+def avatar_bytes(key):
+    """Photo de profil en cache local (téléchargée côté serveur, jamais par le navigateur)."""
+    r = q("SELECT pic FROM chats WHERE key=? AND pic<>''", (key,))
+    if not r:
+        return None
+    url = r[0]["pic"]
+    host = (urlparse(url).hostname or "")
+    if urlparse(url).scheme != "https" or not host.endswith(AVATAR_HOSTS):
+        return None  # liste blanche : pas de requête vers un hôte arbitraire
+    f = DATA / "avatars" / (hashlib.sha1(url.encode()).hexdigest() + ".img")
+    if f.exists():
+        return f.read_bytes()
+    try:
+        data, ctype = media.fetch(url, 2_000_000, timeout=10, ctx=SSL_CTX)   # hôtes autorisés, redirections revalidées, taille limitée
+        if not ctype.startswith("image/") or media.sniff(data[:32], "") not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
+            return None
+        f.write_bytes(data)
+        return data
+    except Exception:
+        return None
+
+
+SEC_DEFAULTS = {
+    "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
+    "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Resource-Policy": "same-origin", "Cache-Control": "no-store",
+}
+
+
+def csp_for(html_bytes):
+    """Politique de contenu stricte : seuls les scripts en ligne dont l'empreinte est connue s'exécutent (une injection HTML ne peut donc pas lancer de script)."""
+    hashes = [base64.b64encode(hashlib.sha256(m).digest()).decode() for m in re.findall(rb"<script>(.*?)</script>", html_bytes, re.S)]
+    return ("default-src 'none'; script-src " + " ".join(f"'sha256-{h}'" for h in hashes) + "; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+            "media-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'")
+
+
+class BoundedServer(ThreadingHTTPServer):
+    """Plafonne le nombre de connexions simultanées (un client lent ou malveillant ne peut pas épuiser les threads)."""
+    _sem = threading.BoundedSemaphore(400)
+
+    def process_request(self, request, client_address):
+        if not self._sem.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        super().process_request(request, client_address)
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._sem.release()
+
+
+class Handler(BaseHTTPRequestHandler):
+    timeout = 12                 # une connexion qui ne parle pas est fermée (anti « slowloris »)
+    server_version = "relais"
+    sys_version = ""
+
+    def log_message(self, *a):
+        pass
+
+    def send_response(self, code, message=None):
+        self._sent = set()
+        super().send_response(code, message)
+
+    def send_header(self, keyword, value):
+        self._sent.add(keyword.lower())
+        super().send_header(keyword, value)
+
+    def end_headers(self):
+        for k, v in SEC_DEFAULTS.items():
+            if k.lower() not in self._sent:
+                BaseHTTPRequestHandler.send_header(self, k, v)
+        super().end_headers()
+
+    def _ok_host(self):
+        h = self.headers.get("Host", "").lower().strip()
+        host = h.split("]")[0] + "]" if h.startswith("[") else h.split(":")[0]
+        return host in ALLOWED_HOSTS
+
+    def _ip(self):
