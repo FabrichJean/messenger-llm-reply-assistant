@@ -1,0 +1,6 @@
+{
+  "manifest_version": 3,
+  "name": "Relais Connect",
+  "version": "1.0",
+  "description": "Connecte ton compte Messenger à ton hub Relais en un clic, avec TON navigateur. Ne lit que les cookies de session de Messenger, uniquement quand tu le demandes depuis ton hub.",
+  "permissions": ["cookies", "storage", "alarms"],
