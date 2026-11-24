@@ -24,3 +24,28 @@ android {
         buildConfigField 'String', 'HUB_URL', "\"${hubUrl}\""
         buildConfigField 'String', 'LOGIN_URL', "\"${loginUrl}\""
         buildConfigField 'String', 'LOGIN_COOKIE_URL', "\"${loginCookieUrl}\""
+        buildConfigField 'String', 'LOGIN_EXTRA_HOST', "\"${loginExtraHost}\""
+    }
+    buildFeatures { buildConfig true }
+    signingConfigs {
+        release {
+            if (ksFile && ksPass) {
+                storeFile file(ksFile)
+                storePassword ksPass
+                keyAlias 'relais'
+                keyPassword ksPass
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (ksFile && ksPass) signingConfig signingConfigs.release
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint { abortOnError false }
+}
