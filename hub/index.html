@@ -1915,3 +1915,277 @@ function renderList(){
   if(!S.accounts.length){
     const rows=$('#rows');rows.dataset.sig='';rows.replaceChildren(el('div',{style:'padding:24px 18px;color:var(--muted);line-height:1.6'},
       el('b',{style:'color:var(--text);font-size:15px'},'Aucun compte Messenger'),el('br'),
+      'Ajoute ton premier compte : une fenêtre de connexion officielle s\'ouvre, tu te connectes toi-même.',el('br'),
+      el('button',{className:'primary',style:'margin-top:12px',textContent:'Ajouter un compte',onclick:()=>$('#bacc').click()})));
+    return;
+  }
+  const q=$('#search').value.toLowerCase(),only=$('#onlyon').checked,rows=$('#rows');
+  const list=[...S.chats].sort((x,y)=>((y.pinned|0)-(x.pinned|0))||(y.last_ts-x.last_ts));
+  const lsig=JSON.stringify([tab,sel,q,only,$('#hideempty').checked,$('#accfilter').value,S.accounts.map(a=>a.name+a.label).join(),list.map(c=>[c.key,c.name,c.last_ts,c.last_text,c.enabled,c.unread,c.pinned,c.drafts,c.attention,c.pic,c.is_group,c.n_msgs])]);
+  if(rows.dataset.sig===lsig)return;
+  rows.dataset.sig=lsig;
+  const keep=rows.scrollTop;rows.replaceChildren();
+  for(const c of list){
+    if(tab==='unread'&&!(c.unread>0))continue;
+    if(tab==='groups'&&!c.is_group)continue;
+    if(only&&!c.enabled)continue;
+    if($('#accfilter').value&&c.account!==$('#accfilter').value)continue;
+    if($('#hideempty').checked&&!c.n_msgs&&/^\d+$/.test(c.name)&&!c.enabled)continue;
+    if(q&&!(c.name.toLowerCase().includes(q)))continue;
+    const sw=el('label',{className:'switch',title:c.is_group?'Pas de LLM dans les groupes':'Activer / désactiver le LLM'},el('input',{type:'checkbox',checked:!!c.enabled,disabled:!!c.is_group}),el('i'));
+    sw.onclick=e=>e.stopPropagation();
+    sw.querySelector('input').onchange=async e=>{const r=await api('/api/chat/settings',{key:c.key,enabled:e.target.checked});if(r.error)toast(r.error,'err');refresh()};
+    const line2=el('div',{className:'ln'});
+    if(c.unread>0)line2.append(el('span',{className:'cnt',title:'Messages reçus sans réponse'},String(c.unread)));
+    if(c.is_group)line2.append(el('span',{className:'gr'},'Groupe'));
+    if(c.drafts)line2.append(el('span',{className:'badge dr'},c.drafts+' brouillon'));
+    if(c.attention)line2.append(el('span',{className:'badge att'},'à toi'));
+    const right=el('div',{className:'r'},el('div',{className:'ln'},el('span',{className:'tm'},fmt(c.last_ts)),c.is_group?'':sw),line2);
+    const nm=el('div',{className:'n'});
+    if(c.pinned){const pn=ih(IC.pin);pn.setAttribute('class','pn');nm.append(pn)}
+    nm.append(el('span',{className:'nm'},c.name));
+    if(S.accounts.length>1)nm.append(el('span',{className:'badge acc'},lbl(c.account)));
+    const row=el('div',{className:'row'+(c.key===sel?' sel':''),tabIndex:0,role:'button'},avatar(c),el('div',{className:'t'},nm,el('div',{className:'s'},c.last_text||'')),right);
+    row.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();row.click()}};
+    row.onclick=()=>{sel=c.key;chatCache=null;dirty=false;document.body.classList.add('open');renderList();loadChat(true);renderChips()};
+    rows.append(row);
+  }
+  if(!rows.children.length)rows.append(el('div',{style:'padding:30px 18px;color:var(--muted);text-align:center'},tab==='unread'?'Aucun message en attente de réponse.':tab==='groups'?'Aucun groupe.':'Aucune conversation.'));
+  rows.scrollTop=keep;
+}
+
+async function loadChat(force){
+  if(!sel)return;
+  const r=await api('/api/chat?key='+encodeURIComponent(sel));
+  if(r.error)return;
+  const pane=$('#chatpane');
+  if(force||!$('#msgs')){buildPane(r)}
+  fillChat(r);
+}
+
+function emptyPane(){
+  const e=el('div',{id:'empty'},el('div',{className:'ei'}),el('b',{className:'t'},'Choisis une conversation'),'Le LLM ne répond ',el('b',{},'jamais'),' tant que tu ne l\'actives pas pour elle.');
+  e.querySelector('.ei').innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 5.500h16v11H10l-4.500 3.500v-3.500H4z"/><path d="M8 10h8M8 13h5"/></svg>';
+  return e;
+}
+const EMOJIS=['😀','😂','😊','😍','😘','😉','😎','🥰','🤔','😅','😢','😭','😡','🙏','👍','👎','👏','🙌','💪','🔥','❤️','💔','🎉','✨','😴','🤝','👀','🙈','😋','🥳','😬','🤗'];
+function menuItem(label,fn,icon){const b=el('button',{className:'it',onclick:()=>{closeDrops();fn()}});if(icon)b.append(ih(IC[icon]));b.append(el('span',{},label));return b}
+function buildPane(r){
+  const pane=$('#chatpane');pane.replaceChildren();
+  const back=el('button',{className:'ib mobback',textContent:'←',onclick:()=>{document.body.classList.remove('open');sel=null;pane.replaceChildren(emptyPane());renderChips()}});
+  const sw=el('label',{className:'switch',id:'csw',title:'Activer / désactiver le LLM pour cette conversation'},el('input',{type:'checkbox'}),el('i'));
+  sw.querySelector('input').onchange=async e=>{const x=await api('/api/chat/settings',{key:sel,enabled:e.target.checked});if(x.error){toast(x.error,'err')}refresh()};
+  const bsearch=el('button',{className:'ib',id:'bcsearch',title:'Rechercher dans la conversation',onclick:()=>{const b=$('#csearch');b.classList.toggle('open');$('#bcsearch').classList.toggle('on',b.classList.contains('open'));if(b.classList.contains('open'))$('#csearch input').focus();else{$('#csearch input').value='';filterMsgs('')}}});bsearch.append(ih(IC.search));
+  const bpin=el('button',{className:'ib',id:'bpin',title:'Épingler en haut de la liste',onclick:async()=>{await api('/api/chat/pin',{key:sel,pinned:$('#bpin').dataset.p!=='1'});refresh()}});bpin.append(ih(IC.pin));
+  const bdel=el('button',{className:'ib',id:'bdel',title:'Supprimer cette conversation de ce hub (Messenger n\'est pas touché)',onclick:async()=>{
+    if(!await ask('Cela efface ici l\'historique local, les brouillons et les pièces jointes en cache.\nRien n\'est supprimé dans Messenger, et la conversation réapparaîtra si un message arrive.',{title:'Supprimer cette conversation de ce hub ?',ok:'Supprimer',danger:true}))return;
+    const x=await api('/api/chat/delete',{key:sel,confirm:true});if(x.error){toast(x.error,'err');return}
+    document.body.classList.remove('open');sel=null;pane.replaceChildren(emptyPane());refresh()}});bdel.append(ih(IC.trash));
+  const syn=el('button',{className:'it',id:'csync',title:'Rattrape les messages manqués',onclick:async()=>{closeDrops();const b=$('#csync'),sp=b.querySelector('span');b.disabled=true;sp.textContent='Synchronisation…';const r=await api('/api/chat/sync',{key:sel});b.disabled=false;sp.textContent='Synchroniser cette conversation';loadChat();refresh();if(r.error)toast(r.error,'err')}},ih(IC.refresh),el('span',{},'Synchroniser cette conversation'));
+  const imp=el('button',{className:'it',id:'cimp',title:'Charge des messages plus anciens pour que le LLM connaisse la conversation et ton style',onclick:async()=>{closeDrops();const r=await api('/api/chat/import',{key:sel,pages:12});if(r.error)toast(r.error,'err');else if(!r.ok)toast('Une tâche est déjà en cours : attends sa fin (progression en bas à droite).','err');refresh()}},ih(IC.hist),el('span',{},'Importer l\'historique'));
+  const mdrop=el('div',{className:'drop',id:'mdrop'},
+    menuItem('Renommer',async()=>{const v=await askForm('Renommer la conversation',[{id:'name',label:'Nom à afficher',value:$('#cname').textContent}],'Renommer');if(!v)return;await api('/api/chat/rename',{key:sel,name:v.name});refresh()},'pencil'),
+    syn,menuItem('Réglages de la conversation',toggleCset,'gear'));
+  const adrop=el('div',{className:'drop',id:'adrop'},
+    menuItem('Répondre maintenant',()=>forceReply(true),'bolt'),menuItem('Générer un brouillon',()=>forceReply(false),'pencil'),menuItem('Aperçu de la réponse',previewReply,'eye'),
+    el('div',{className:'hr'}),menuItem('Préparer cette conversation',async()=>{LS('hub_cset','1');applyView();const x=await api('/api/chat/prepare',{key:sel});if(x.error)toast(x.error,'err');loadChat()},'spark'),imp);
+  const bmore=el('button',{className:'ib',id:'bmore',title:'Plus d\'options','data-drop':'mdrop'});bmore.append(ih(IC.more));
+  const bact=el('button',{id:'bact',className:'ib',title:'Actions : répondre maintenant, brouillon, aperçu…','data-drop':'adrop'});bact.append(ih(IC.bolt));
+  const head=el('div',{id:'chead'},back,el('span',{id:'cav'}),
+    el('div',{className:'who'},el('h2',{id:'cname'}),el('div',{className:'st'},el('span',{className:'dot'}),el('span',{id:'cstat'}),el('span',{id:'cbadge',className:'badge'}),
+      el('button',{id:'climit',className:'badge att',style:'display:none;cursor:pointer',title:'Cliquer pour autoriser 10 réponses de plus par heure',onclick:async()=>{await api('/api/chat/raise_limit',{key:sel});loadChat();refresh()}}),
+      el('button',{id:'cmute',className:'badge att',style:'display:none;cursor:pointer',title:'Cliquer pour ignorer ce silence et laisser le LLM répondre',onclick:async()=>{await api('/api/chat/unmute',{key:sel});loadChat();refresh()}}))),
+    el('div',{className:'llm'},el('span',{},'LLM'),sw),
+    el('div',{className:'ics'},bsearch,bpin,bdel,bmore,bact),mdrop,adrop);
+  const csearch=el('div',{id:'csearch'},el('input',{type:'text',placeholder:'Rechercher dans la conversation…',oninput:e=>filterMsgs(e.target.value)}));
+  const msgs=el('div',{id:'msgs'});
+  const drafts=el('div',{id:'drafts'});
+  const hint=el('input',{type:'text',id:'f_hint',placeholder:'Consigne ponctuelle (facultatif) : ex. « dis que j\'arrive dans 10 min »'});
+  const fbtn=el('button',{className:'ok',id:'f_send',textContent:'Répondre maintenant',title:'Le LLM lit le dernier contexte et envoie une réponse tout de suite',onclick:()=>forceReply(true)});
+  const dbtn=el('button',{id:'f_draft',textContent:'Brouillon',title:'Génère une réponse que tu valides avant envoi',onclick:()=>forceReply(false)});
+  const pbtn=el('button',{id:'f_prev',textContent:'Aperçu',title:'Voir ce que le LLM répondrait, sans rien envoyer',onclick:previewReply});
+  const forcebar=el('div',{id:'forcebar'},hint,pbtn,fbtn,dbtn);
+  const ta=el('input',{type:'text',id:'sendtxt',placeholder:'Écrire un message…',title:'Écrire toi-même dans cette conversation (rien ne part sans que tu l\'envoies)'});
+  ta.onkeydown=e=>{if(e.key==='Enter')sendManual()};
+  const emo=el('div',{id:'emojis'},...EMOJIS.map(e=>el('button',{textContent:e,onclick:()=>{ta.value+=e;ta.focus();emo.classList.remove('open')}})));
+  const bemoji=el('button',{className:'ib',id:'bemoji',title:'Emoji',onclick:ev=>{ev.stopPropagation();emo.classList.toggle('open')}});bemoji.append(ih(IC.smile));
+  const bclip=el('button',{className:'ib',disabled:true,title:'Envoi de pièces jointes : pas encore disponible'});bclip.append(ih(IC.clip));
+  const bimg=el('button',{className:'ib',disabled:true,title:'Envoi d\'images : pas encore disponible'});bimg.append(ih(IC.img));
+  const bbolt=el('button',{id:'bbolt',title:'Répondre maintenant avec le LLM (consigne, aperçu, brouillon)',onclick:()=>{const f=$('#forcebar');f.classList.toggle('open');$('#bbolt').classList.toggle('on',f.classList.contains('open'));if(f.classList.contains('open'))$('#f_hint').focus()}});bbolt.append(ih(IC.bolt));
+  const sendBtn=el('button',{className:'primary',id:'bsend',onclick:sendManual},ih(IC.send),'Envoyer');
+  const compose=el('div',{id:'compose'},emo,bemoji,bclip,bimg,ta,bbolt,sendBtn);
+  const cset=el('div',{id:'cset'},
+    el('label',{},'Mode',el('select',{id:'c_mode'},new Option('Automatique (envoie seul)','auto'),new Option('Brouillon (tu valides)','draft'))),
+    el('label',{},'Délai avant réponse (s)',el('input',{type:'number',id:'c_delay',min:0,max:300})),
+    el('label',{},'Max réponses / heure',el('input',{type:'number',id:'c_max',min:1,max:100})),
+    el('label',{className:'full',style:'flex-direction:row;align-items:center;gap:8px;color:var(--text)'},el('input',{type:'checkbox',id:'c_trusted',style:'width:auto'}),'Contact de confiance : ne pas bloquer sur les messages « suspects » ni demander de second contrôle (le filtre des liens, numéros et secrets reste actif)'),
+    el('label',{className:'full',style:'flex-direction:row;align-items:center;gap:8px;color:var(--text)'},el('input',{type:'checkbox',id:'c_noquiet',style:'width:auto'}),'Ne jamais se taire quand j\'écris dans cette conversation (ignorer la reprise en main)'),
+    el('label',{className:'full'},'Instructions pour cette conversation (qui est cette personne, ce que le LLM doit dire ou éviter)',el('textarea',{id:'c_inst'})),
+    el('label',{className:'full'},'Mémoire de cette conversation — une ligne par information « - [catégorie|confiance] contenu » (confirmé, observé, probable). Tu peux corriger ou vider : tes lignes « confirmé » priment',el('textarea',{id:'c_mem',placeholder:'- [relation|confirmé] ami proche\n- [événement|confirmé] examen (échéance 2026-12-05)\n- [engagement|confirmé] doit envoyer le fichier (en attente)'}),el('button',{type:'button',style:'margin-top:6px;align-self:flex-start',textContent:'Mettre à jour maintenant',onclick:async()=>{const r=await api('/api/chat/memory/refresh',{key:sel});r.error?toast(r.error,'err'):toast('Mise à jour lancée : rouvre les réglages dans quelques secondes.','ok')}})),
+    el('div',{className:'full',id:'c_prepbox'}),
+    el('div',{className:'full',style:'display:flex;gap:8px;align-items:center'},el('button',{className:'primary',textContent:'Enregistrer ces réglages',onclick:saveChatSettings}),el('span',{id:'csaved'})));
+  for(const id of ['c_mode','c_delay','c_max','c_inst','c_mem'])cset.querySelector('#'+id).oninput=()=>dirty=true;
+  cset.querySelector('#c_noquiet').onchange=()=>dirty=true;
+  cset.querySelector('#c_trusted').onchange=()=>dirty=true;
+  const tob=el('button',{id:'tobottom',title:'Aller aux derniers messages','aria-label':'Aller aux derniers messages',onclick:()=>{msgs.scrollTo({top:msgs.scrollHeight,behavior:'smooth'})}});tob.append(ih(IC.chev));
+  msgs.addEventListener('scroll',()=>tob.classList.toggle('show',msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight>240),{passive:true});
+  pane.append(head,csearch,msgs,drafts,forcebar,compose,cset,tob);
+  applyView();
+}
+function filterMsgs(t){
+  t=t.trim().toLowerCase();let first=null;
+  document.querySelectorAll('#msgs .mrow').forEach(r=>{const hit=!t||r.textContent.toLowerCase().includes(t);r.style.display=hit?'':'none';r.querySelector('.m')?.classList.toggle('hit',!!t&&hit);if(t&&hit&&!first)first=r});
+  document.querySelectorAll('#msgs .dsep').forEach(d=>d.style.display=t?'none':'');
+  if(first)first.scrollIntoView({block:'center'});
+}
+
+// ---- pièces jointes et liens
+const URL_RE=/(https?:\/\/[^\s<>"']+)/g;
+function linkify(t){
+  const out=[];let last=0;t.replace(URL_RE,(m,u,i)=>{
+    let url=u,tail='';const mt=url.match(/[.,;:!?)\]]+$/);if(mt){tail=mt[0];url=url.slice(0,-tail.length)}
+    if(i>last)out.push(t.slice(last,i));
+    out.push(el('a',{href:url,target:'_blank',rel:'noopener noreferrer',textContent:url.length>70?url.slice(0,67)+'…':url,title:url}));
+    if(tail)out.push(tail);last=i+m.length;return m});
+  if(last<t.length)out.push(t.slice(last));return out;
+}
+const fmtSize=n=>!n?'':n<1024?n+' o':n<1048576?Math.round(n/1024)+' Ko':(n/1048576).toFixed(1)+' Mo';
+const fmtDur=ms=>{if(!ms)return '';const s=Math.round(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const hostOf=u=>{try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return ''}};
+const ATT_ONLY=/^\[(image|GIF|sticker|vidéo|message vocal|fichier|lien partagé|position|média éphémère|pièce jointe \/ sticker)\]$/;
+function attPh(msg){return el('div',{className:'ph'},msg)}
+const fbLabel=u=>{let p='';try{p=new URL(u).pathname}catch(e){}return /\/share\/r\//.test(p)||/\/reel\//.test(p)?'Reel Facebook':/\/share\/v\//.test(p)||/\/watch|\/videos?\//.test(p)?'Vidéo Facebook':/\/share\/p\//.test(p)||/\/posts\//.test(p)?'Publication Facebook':'Lien Facebook'};
+function attNode(a){
+  const src='/media/'+a.id,box=el('div',{className:'att-i'});
+  const lazyImg=(cls,url)=>{const im=el('img',{className:cls||'',loading:'lazy',alt:a.name||a.kind,src:url});if(a.w&&a.h){im.width=Math.min(a.w,300);im.height=Math.round(Math.min(a.w,300)*a.h/a.w)}im.onerror=()=>im.replaceWith(attPh((a.kind==='sticker'?'Sticker':'Image')+' indisponible (expirée ou trop ancienne)'));return im};
+  const vid=(extra)=>{const v=el('video',Object.assign({src:src,preload:'none',playsInline:true},extra||{}));v.onerror=()=>v.replaceWith(attPh('Vidéo indisponible'));return v};
+  if(a.kind==='image'||(a.kind==='gif'&&!/^video/.test(a.mime))){return el('a',{href:src,target:'_blank',rel:'noopener'},lazyImg('',src))}
+  if(a.kind==='gif'){const v=vid({autoplay:true,loop:true,muted:true,controls:false});v.preload='auto';v.muted=true;return v}
+  if(a.kind==='sticker'){return lazyImg('st',src)}
+  if(a.kind==='video'){const v=vid({controls:true});if(a.has_preview)v.poster=src+'?p=1';return v}
+  if(a.kind==='audio'){const au=el('audio',{src:src,controls:true,preload:'none'});au.onerror=()=>au.replaceWith(attPh('Message vocal indisponible'));return el('div',{},au,a.dur?el('small',{style:'display:block'},fmtDur(a.dur)):'')}
+  if(a.kind==='file'){return el('a',{className:'card',href:src+'?dl=1',download:a.name||'',target:'_blank',rel:'noopener'},(()=>{const i=el('span',{className:'ic'});i.append(ih(IC.file));return i})(),el('span',{className:'tx'},el('div',{className:'tt'},a.name||'Fichier'),el('div',{className:'ds'},[fmtSize(a.size),a.mime].filter(Boolean).join(' · ')||'Télécharger')))}
+  if(a.kind==='link'){
+    const body=[];
+    const pimg=a.img||(a.has_preview?src+'?p=1':'');
+    if(pimg)body.push(lazyImg('',pimg));
+    const host=a.site||hostOf(a.action);
+    const pth=(()=>{try{const u=new URL(a.action||'');return (u.pathname+u.search).replace(/^\/$/,'')}catch(e){return ''}})();
+    const fb=(!a.title&&/(^|\.)(facebook\.com|fb\.watch|fb\.com)$/.test(hostOf(a.action)))?fbLabel(a.action):'';
+    body.push(el('div',{className:'tx'},el('div',{className:'tt'},a.title||fb||host||'Lien'),(a.descr||a.subtitle)?el('div',{className:'ds'},a.descr||a.subtitle):(a.pending?el('div',{className:'ds'},'Chargement de l\'aperçu…'):(!a.title&&pth?el('div',{className:'ds'},pth):'')),(a.title&&host)?el('div',{className:'ds'},host):''));
+    return a.action?el('a',{className:'lk',href:a.action,target:'_blank',rel:'noopener noreferrer'},...body):el('div',{className:'lk'},...body)}
+  if(a.kind==='location'){return el('a',{className:'card',href:a.action||'#',target:'_blank',rel:'noopener noreferrer'},(()=>{const i=el('span',{className:'ic'});i.append(ih(IC.mappin));return i})(),el('span',{className:'tx'},el('div',{className:'tt'},a.title||'Position partagée'),el('div',{className:'ds'},'Ouvrir la carte')))}
+  if(a.kind==='ephemeral'){return attPh('Média éphémère (non affichable)')}
+  return attPh('Pièce jointe')
+}
+function msgBody(m){
+  const nodes=[];
+  if(m.deleted){nodes.push('Message supprimé');return nodes}
+  const atts=m.atts||[];
+  if(!(atts.length&&ATT_ONLY.test(m.text)))nodes.push(...linkify(m.text));
+  if(atts.length)nodes.push(el('div',{className:'att'},...atts.map(attNode)));
+  return nodes;
+}
+function relaisAv(){const d=el('span',{className:'av sm',title:'Réponse du LLM'});d.style.background='#241510';d.style.border='2px solid #ff8a3d66';d.innerHTML='<svg viewBox="0 0 44 44" style="width:70%;height:70%"><use href="#i-logo"/></svg>';return d}
+function fillChat(r){
+  const c=r.chat;
+  $('#cname').textContent=c.name;
+  const lm=$('#climit');const full=c.enabled&&c.llm_hour>=c.max_per_hour;lm.style.display=full?'inline':'none';lm.textContent='Limite horaire atteinte ('+c.llm_hour+'/'+c.max_per_hour+') — cliquer pour +10';
+  const mu=$('#cmute');mu.style.display=c.muted_min?'inline':'none';mu.textContent='LLM muet encore ~'+c.muted_min+' min — cliquer pour ignorer';
+  const av=$('#cav');if(av.dataset.k!==c.key+c.pic){av.dataset.k=c.key+c.pic;av.replaceChildren(avatar(c,'xl'))}
+  $('#cstat').textContent=c.is_group?'Groupe':(c.route==='e2ee'?'Chiffré de bout en bout':'Messagerie classique');
+  const b=$('#cbadge');b.textContent=c.is_group?'groupe':(c.enabled?(c.mode==='draft'?'brouillon':'automatique'):'LLM inactif');
+  const sw=$('#csw input');sw.checked=!!c.enabled;sw.disabled=!!c.is_group;
+  const bp=$('#bpin');bp.dataset.p=c.pinned?'1':'0';bp.classList.toggle('on',!!c.pinned);bp.title=c.pinned?'Désépingler':'Épingler en haut de la liste';
+  const ib=$('#cimp');if(ib){const hOk=S.accounts.some(a=>a.history==='enrolled');ib.disabled=c.route==='e2ee'&&!hOk;ib.title=c.route==='e2ee'&&!hOk?'Conversation chiffrée : restaure d\'abord l\'historique chiffré (onglet Historique) avec ton code PIN':'Charge des messages plus anciens pour que le LLM connaisse la conversation et ton style'}
+  renderChips();
+  const box=$('#msgs');const atEnd=box.scrollTop+box.clientHeight>=box.scrollHeight-60;
+  const msig=c.key+JSON.stringify(r.messages.map(m=>[m.id,m.text,m.edited,m.deleted,m.local_edit,(m.atts||[]).map(a=>a.id+a.kind+a.has_main+(a.img||'')+(a.title||'')+(a.pending?'p':''))]));
+  if(!window.__editing&&box.dataset.sig!==msig){box.dataset.sig=msig;
+    const nodes=[];let lastDay='';
+    for(const m of r.messages){
+      const dk=new Date(m.ts).toDateString();
+      if(dk!==lastDay){lastDay=dk;nodes.push(el('div',{className:'dsep'},dayLabel(m.ts)))}
+      const mine=m.src!=='contact';
+      const who=(m.src==='llm'?'LLM · ':m.src==='owner'?'Toi · ':'');
+      const small=el('small',{},who+hm(m.ts)+(m.edited&&!m.deleted?' · modifié':'')+(m.local_edit&&!m.deleted?' · modifié ici':''));
+      if(mine&&!m.deleted)small.append(ih(IC.check2));
+      const d=el('div',{className:'m '+(m.src==='contact'?'':m.src)},...msgBody(m),small);
+      if(m.deleted){d.style.opacity='.55';d.style.fontStyle='italic'}else{d.append(el('button',{className:'eb',title:"Modifier dans l'historique local (rien n'est envoyé à Messenger)",onclick:()=>editMsg(m,d)},ih(IC.pencil)))}
+      const av=mine?(m.src==='llm'?relaisAv():placeholder({name:S.settings.owner||'Moi',key:'me'},'sm')):avatar(c,'sm');
+      nodes.push(el('div',{className:'mrow'+(mine?' me':'')},...(mine?[d,av]:[av,d])));
+    }
+    if(!nodes.length)nodes.push(el('div',{style:'margin:auto;color:var(--muted);text-align:center'},'Aucun message pour l\'instant.'));
+    box.replaceChildren(...nodes);
+    const sv=$('#csearch input');if(sv&&sv.value)filterMsgs(sv.value);
+  }
+  if(atEnd||!box.dataset.init){box.scrollTop=box.scrollHeight;box.dataset.init=1}
+  const dr=$('#drafts');const pv=$('#pvbox');dr.replaceChildren();if(pv)dr.append(pv);
+  for(const d of r.drafts){
+    const t=el('textarea',{value:d.text});
+    dr.append(el('div',{className:'d'},el('b',{},'Brouillon du LLM'),t,el('div',{className:'btns'},
+      el('button',{className:'ok',textContent:'Envoyer',onclick:async()=>{const x=await api('/api/draft',{id:d.id,action:'send',text:t.value});if(x.error)toast(x.error,'err');loadChat()}}),
+      el('button',{textContent:'Ignorer',onclick:async()=>{await api('/api/draft',{id:d.id,action:'discard'});loadChat()}}))));
+  }
+  if(!dirty){$('#c_trusted').checked=!!c.trusted;$('#c_noquiet').checked=!!c.takeover_off;$('#c_mode').value=c.mode;$('#c_delay').value=c.delay_s;$('#c_max').value=c.max_per_hour;$('#c_inst').value=c.instructions||'';$('#c_mem').value=c.memory||''}
+  const pb=$('#c_prepbox'),pr=r.prepared,sig=(pr?(pr.busy?'b':'')+(pr.text||'').length+(pr.err||''):'-')+c.key;
+  if(pb.dataset.sig!==sig){
+    pb.dataset.sig=sig;pb.replaceChildren();
+    pb.append(el('button',{textContent:(pr&&pr.busy)?'Analyse de la conversation…':'Préparer cette conversation',disabled:!!(pr&&pr.busy),title:"Le LLM lit l'historique et te propose des instructions à relire",onclick:async()=>{const x=await api('/api/chat/prepare',{key:sel});if(x.error)toast(x.error,'err');loadChat()}}));
+    if(pr&&pr.err)pb.append(el('div',{style:'color:var(--bad);margin-top:6px'},pr.err));
+    if(pr&&pr.text){
+      const ta=el('textarea',{value:pr.text});ta.style.minHeight='160px';ta.style.marginTop='8px';
+      pb.append(el('div',{style:'margin-top:8px;padding:10px;border:1px dashed var(--accent);border-radius:10px'},
+        el('b',{},'Proposition du LLM : relis et corrige avant de l\'utiliser'),ta,
+        el('div',{style:'display:flex;gap:8px;margin-top:6px;align-items:center'},
+          el('button',{className:'ok',textContent:'Mettre dans les instructions',onclick:async()=>{$('#c_inst').value=ta.value;dirty=true;await api('/api/chat/prepare/discard',{key:sel});loadChat();$('#csaved').textContent='Pense à cliquer sur « Enregistrer ces réglages »'}}),
+          el('button',{textContent:'Ignorer',onclick:async()=>{await api('/api/chat/prepare/discard',{key:sel});loadChat()}}))));
+    }
+  }
+  if(c.attention&&!dr.children.length){dr.append(el('div',{className:'d',style:'border-color:var(--warn)'},'Le LLM a passé la main'+(c.attention_note?' — raison : '+c.attention_note:'')+'. Réponds toi-même, ou utilise « Répondre maintenant » avec une consigne ponctuelle. ',el('button',{textContent:'OK',onclick:async()=>{await api('/api/clear_attention',{key:sel});refresh()}})))}
+}
+
+async function saveChatSettings(){
+  const x=await api('/api/chat/settings',{key:sel,mode:$('#c_mode').value,delay_s:+$('#c_delay').value,max_per_hour:+$('#c_max').value,instructions:$('#c_inst').value,memory:$('#c_mem').value,takeover_off:$('#c_noquiet').checked,trusted:$('#c_trusted').checked});
+  dirty=false;$('#csaved').textContent=x.error||'Enregistré ✓';setTimeout(()=>$('#csaved')&&($('#csaved').textContent=''),2000);refresh();
+}
+function editMsg(m,d){
+  window.__editing=true;
+  const ta=el('textarea',{value:m.text});ta.style.minHeight='70px';ta.style.width='100%';
+  const finish=()=>{window.__editing=false;loadChat()};
+  const note=el('small',{},"Modifie seulement l'historique de cette application : rien n'est envoyé dans Messenger. Le LLM lira la version corrigée.");
+  const btns=[el('button',{className:'ok',textContent:'Enregistrer',onclick:async()=>{const r=await api('/api/message/edit',{key:sel,id:m.id,text:ta.value});if(r.error){toast(r.error,'err');return}finish()}}),
+              el('button',{textContent:'Annuler',onclick:finish})];
+  if(m.local_edit)btns.push(el('button',{textContent:"Rétablir l'original",onclick:async()=>{await api('/api/message/edit',{key:sel,id:m.id,revert:true});finish()}}));
+  d.replaceChildren(ta,note,el('div',{style:'display:flex;gap:8px;margin-top:6px;flex-wrap:wrap'},...btns));
+  d.style.maxWidth='92%';ta.focus();
+}
+async function forceReply(send){
+  const b1=$('#f_send'),b2=$('#f_draft'),hint=$('#f_hint');
+  b1.disabled=b2.disabled=true;const t1=b1.textContent;b1.textContent='Génération…';
+  try{
+    const r=await api('/api/chat/force',{key:sel,send,hint:hint.value});
+    if(r.error)toast(r.error,'err');
+    else if(r.skipped)toast('Le LLM a passé la main'+(r.reason?' — raison : '+r.reason:'')+'.\nAjoute une consigne ponctuelle pour le guider, ou assouplis les instructions de la conversation.');
+    else hint.value='';
+  }finally{b1.disabled=b2.disabled=false;b1.textContent=t1;loadChat();refresh()}
+}
+async function previewReply(){
+  const b=$('#f_prev');b.disabled=true;const t0=b.textContent;b.textContent='Aperçu…';
+  let r;try{r=await api('/api/chat/preview',{key:sel})}finally{b.disabled=false;b.textContent=t0}
+  const box=$('#drafts');
+  const old=$('#pvbox');if(old)old.remove();
+  const wrap=el('div',{id:'pvbox',className:'d'});
+  if(r.error){wrap.append(el('b',{},'Aperçu impossible : '),r.error)}
+  else{
+    const lab={reply:'Réponse que le LLM enverrait',decoy:'Réponse sarcastique (leurre) : message jugé suspect',skip:'Le LLM ne répondrait pas',blocked:'Réponse BLOQUÉE par le filtre de sécurité'}[r.kind]||r.kind;
+    wrap.append(el('b',{},'Aperçu : '+lab));
+    if(r.why)wrap.append(el('div',{style:'color:var(--muted);font-size:12px'},r.why));
+    for(const i of r.info||[])wrap.append(el('div',{style:'color:var(--muted);font-size:12px'},'• '+i));
+    if(r.text){
+      const ta=el('textarea',{value:r.text});ta.style.minHeight='70px';ta.style.margin='6px 0';wrap.append(ta);
+      const row=el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'});
+      if(r.kind!=='blocked')row.append(el('button',{className:'ok',textContent:'Envoyer ceci',onclick:async()=>{const x=await api('/api/chat/send_preview',{key:sel,text:ta.value});if(x.error)toast(x.error,'err');wrap.remove();loadChat();refresh()}}));
+      row.append(el('button',{textContent:'Fermer',onclick:()=>wrap.remove()}));
+      wrap.append(row);
+    }else wrap.append(el('div',{style:'margin-top:6px'},el('button',{textContent:'Fermer',onclick:()=>wrap.remove()})));
