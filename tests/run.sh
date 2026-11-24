@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 what="${1:-all}"
 if [[ "$what" == all || "$what" == go ]]; then
   echo "== Go : build, vet, tests"
-  go build -o /dev/null . && go vet ./... && go test ./...
+  go build -o /dev/null ./cmd/messenger-lite && go vet ./... && go test ./...
 fi
 if [[ "$what" == all || "$what" == hub ]]; then
   echo "== Hub : tests de bout en bout (démarrent un vrai hub jetable)"

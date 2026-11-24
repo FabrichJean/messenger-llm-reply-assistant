@@ -1,4 +1,4 @@
-package main
+package history
 
 // Historique des conversations chiffrées (E2EE) : restauration par code PIN (stockage sécurisé Messenger).
 //
@@ -13,6 +13,8 @@ import (
 	"errors"
 	"go.mau.fi/whatsmeow/proto/waArmadilloApplication"
 	"go.mau.fi/whatsmeow/proto/waConsumerApplication"
+	"messenger-lite/internal/attachments"
+	"messenger-lite/internal/protocol"
 	"os"
 	"strconv"
 	"sync"
@@ -81,7 +83,7 @@ func (h *historyStore) device() *securehistory.Device {
 }
 
 // historyStatus ne modifie rien : il lit seulement l'état.
-func historyStatus(ctx context.Context, client *messagix.Client) map[string]any {
+func Status(ctx context.Context, client *messagix.Client) map[string]any {
 	if d := hist.device(); d != nil && d.ID != "" {
 		return map[string]any{"type": "history", "state": "enrolled"}
 	}
@@ -96,7 +98,7 @@ func historyStatus(ctx context.Context, client *messagix.Client) map[string]any 
 }
 
 // enrollHistory restaure l'accès à l'historique avec le PIN (ENREGISTRE un appareil d'historique sur le compte).
-func enrollHistory(ctx context.Context, client *messagix.Client, wa *store.Device, selfID int64, pin string) map[string]any {
+func Enroll(ctx context.Context, client *messagix.Client, wa *store.Device, selfID int64, pin string) map[string]any {
 	fail := func(err error) map[string]any {
 		out := map[string]any{"type": "history", "state": "error", "error": err.Error()}
 		var rec *securehistory.RecoveryError
@@ -151,7 +153,7 @@ func enrollHistory(ctx context.Context, client *messagix.Client, wa *store.Devic
 }
 
 // fetchHistoryPage lit une page de messages chiffrés plus anciens que beforeMs et les émet.
-func fetchHistoryPage(ctx context.Context, client *messagix.Client, chatUser string, beforeMs int64, count int,
+func FetchPage(ctx context.Context, client *messagix.Client, chatUser string, beforeMs int64, count int,
 	selfID int64, emit func(any)) map[string]any {
 	dev := hist.device()
 	out := map[string]any{"type": "history_fetched", "chat": chatUser}
@@ -180,18 +182,18 @@ func fetchHistoryPage(ctx context.Context, client *messagix.Client, chatUser str
 			continue
 		}
 		thread, _ := strconv.ParseInt(chatUser, 10, 64)
-		atts := e2eeAttachments(app, thread, chatUser+"@msgr", id)
+		atts := attachments.E2EEAttachments(app, thread, chatUser+"@msgr", id)
 		if arm != nil {
 			if text == "" {
-				text = armadilloText(arm)
+				text = attachments.ArmadilloText(arm)
 			}
-			atts = append(atts, armadilloAttachments(arm, thread, chatUser+"@msgr", id)...)
+			atts = append(atts, attachments.ArmadilloAttachments(arm, thread, chatUser+"@msgr", id)...)
 		}
 		for _, a := range atts {
 			a["ts"], a["history"] = ts, true
 			emit(a)
 		}
-		emit(inMessage{Type: "message", ThreadID: thread, Chat: chatUser + "@msgr", MessageID: id, SenderID: sender,
+		emit(protocol.Event{Type: "message", ThreadID: thread, Chat: chatUser + "@msgr", MessageID: id, SenderID: sender,
 			Text: text, TimeMs: ts, FromMe: sender == selfID, History: true, E2EE: true})
 		n++
 	}
@@ -224,6 +226,9 @@ func decodeArchive(m *securehistory.DecryptedMessage) (id string, sender int64, 
 	sender, _ = strconv.ParseInt(meta.GetSenderID(), 10, 64)
 	capp = decoded.GetConsumerApplication()
 	arm = decoded.GetArmadillo()
-	text = e2eeText(capp)
+	text = attachments.E2EEText(capp)
 	return meta.GetMessageID(), sender, text, m.Message.TimestampMS, capp, arm, meta.GetMessageID() != ""
 }
+
+// Load lit l'appareil d'historique enregistré (history_device.json), s'il existe.
+func Load() { hist.load() }

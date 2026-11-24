@@ -7,7 +7,7 @@ cookies.json
 *.db-wal
 *.db-shm
 history_device.json*
-messenger-lite
+/messenger-lite
 hub/hub.db*
 hub/sandbox
 hub/*.err

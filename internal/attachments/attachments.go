@@ -1,4 +1,4 @@
-package main
+package attachments
 
 // Pièces jointes : liens, images, GIF, stickers, vidéos, messages vocaux, fichiers, positions.
 //
@@ -25,7 +25,7 @@ import (
 	"go.mau.fi/mautrix-meta/pkg/messagix/table"
 )
 
-type attachment = map[string]any
+type Attachment = map[string]any
 
 func attKind(t table.AttachmentType, mime string) string {
 	switch t {
@@ -52,7 +52,7 @@ func attKind(t table.AttachmentType, mime string) string {
 	return "file"
 }
 
-func nz(m attachment, k string, v any) {
+func nz(m Attachment, k string, v any) {
 	switch x := v.(type) {
 	case string:
 		if x == "" {
@@ -71,13 +71,13 @@ func nz(m attachment, k string, v any) {
 }
 
 // classicAttachments extrait les pièces jointes d'une table de synchronisation (canal classique).
-func classicAttachments(e *table.LSTable) []attachment {
-	var out []attachment
-	add := func(thread int64, msgID string, idx int64, kind, name, mime string, size, w, h, dur int64, url, preview string) attachment {
+func ClassicAttachments(e *table.LSTable) []Attachment {
+	var out []Attachment
+	add := func(thread int64, msgID string, idx int64, kind, name, mime string, size, w, h, dur int64, url, preview string) Attachment {
 		if thread == 0 || msgID == "" {
 			return nil
 		}
-		a := attachment{"type": "attachment", "source": "classic", "thread": thread, "id": msgID, "idx": idx, "kind": kind}
+		a := Attachment{"type": "attachment", "source": "classic", "thread": thread, "id": msgID, "idx": idx, "kind": kind}
 		nz(a, "name", name)
 		nz(a, "mime", mime)
 		nz(a, "size", size)
@@ -171,7 +171,7 @@ func (r *mediaRef) blob() string {
 }
 
 // e2eeText : texte d'un message chiffré (texte simple, texte enrichi d'un lien, légende d'une image ou d'une vidéo).
-func e2eeText(app *waConsumerApplication.ConsumerApplication) string {
+func E2EEText(app *waConsumerApplication.ConsumerApplication) string {
 	c := app.GetPayload().GetContent()
 	if t := c.GetMessageText().GetText(); t != "" {
 		return t
@@ -186,11 +186,11 @@ func e2eeText(app *waConsumerApplication.ConsumerApplication) string {
 }
 
 // e2eeAttachments décrit les pièces jointes d'un message chiffré.
-func e2eeAttachments(app *waConsumerApplication.ConsumerApplication, thread int64, chat, msgID string) []attachment {
+func E2EEAttachments(app *waConsumerApplication.ConsumerApplication, thread int64, chat, msgID string) []Attachment {
 	c := app.GetPayload().GetContent()
-	var out []attachment
-	mk := func(kind, mtype string, r *mediaRef, name string) attachment {
-		a := attachment{"type": "attachment", "source": "e2ee", "thread": thread, "chat": chat, "id": msgID, "idx": int64(0), "kind": kind}
+	var out []Attachment
+	mk := func(kind, mtype string, r *mediaRef, name string) Attachment {
+		a := Attachment{"type": "attachment", "source": "e2ee", "thread": thread, "chat": chat, "id": msgID, "idx": int64(0), "kind": kind}
 		if r != nil {
 			a["blob"] = r.blob()
 			a["mtype"] = mtype
@@ -305,17 +305,17 @@ func httpURL(s string) string {
 }
 
 // armadilloText : texte qui accompagne un message enrichi (post partagé, reel…).
-func armadilloText(a *waArmadilloApplication.Armadillo) string {
+func ArmadilloText(a *waArmadilloApplication.Armadillo) string {
 	return a.GetPayload().GetContent().GetExtendedContentMessage().GetMessageText()
 }
 
 // armadilloAttachments décrit les messages « enrichis » du canal chiffré : posts, reels, histoires et liens partagés, galeries, éphémères.
-func armadilloAttachments(a *waArmadilloApplication.Armadillo, thread int64, chat, msgID string) []attachment {
+func ArmadilloAttachments(a *waArmadilloApplication.Armadillo, thread int64, chat, msgID string) []Attachment {
 	c := a.GetPayload().GetContent()
-	base := func(kind string) attachment {
-		return attachment{"type": "attachment", "source": "e2ee", "thread": thread, "chat": chat, "id": msgID, "idx": int64(0), "kind": kind}
+	base := func(kind string) Attachment {
+		return Attachment{"type": "attachment", "source": "e2ee", "thread": thread, "chat": chat, "id": msgID, "idx": int64(0), "kind": kind}
 	}
-	var out []attachment
+	var out []Attachment
 	if x := c.GetExtendedContentMessage(); x != nil {
 		at := base("link")
 		nz(at, "title", firstNonEmpty(x.GetTitleText(), x.GetHeaderTitle()))
@@ -371,7 +371,7 @@ var mediaTypes = map[string]whatsmeow.MediaType{
 var reqName = regexp.MustCompile(`^[0-9a-f]{8,64}(_p)?$`)
 
 // downloadE2EEMedia déchiffre un média chiffré et l'écrit dans media/<req> (dossier du compte, droits restreints).
-func downloadE2EEMedia(ctx context.Context, cli *whatsmeow.Client, blob, mtype, req string, max int64) (string, int64, error) {
+func DownloadE2EEMedia(ctx context.Context, cli *whatsmeow.Client, blob, mtype, req string, max int64) (string, int64, error) {
 	if cli == nil {
 		return "", 0, fmt.Errorf("canal chiffré non connecté")
 	}
@@ -418,7 +418,7 @@ func downloadE2EEMedia(ctx context.Context, cli *whatsmeow.Client, blob, mtype, 
 }
 
 // attachmentShapes résume les lignes de pièces jointes d'une table : types et indicateurs seulement (aucun contenu).
-func attachmentShapes(e *table.LSTable) []map[string]any {
+func AttachmentShapes(e *table.LSTable) []map[string]any {
 	var out []map[string]any
 	flag := func(table string, t table.AttachmentType, thread int64, msg string, vals map[string]string) {
 		m := map[string]any{"table": table, "type": int64(t), "thread0": thread == 0, "msg0": msg == ""}

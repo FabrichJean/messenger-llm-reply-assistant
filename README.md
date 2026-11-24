@@ -107,7 +107,7 @@ Le hub n'écoute que sur `127.0.0.1` du serveur : ouvre-le par un tunnel SSH (`s
 ## Développement local
 
 ```bash
-go build -o messenger-lite .        # client Messenger (Go, CGO requis pour SQLite)
+go build -o messenger-lite ./cmd/messenger-lite   # client Messenger (Go, CGO requis pour SQLite)
 python3 hub/hub.py                  # hub sur http://127.0.0.1:8787
 go test ./...                       # tests du client
 tests/run.sh                        # tous les tests (client Go + hub de bout en bout)
@@ -144,7 +144,8 @@ La connexion Messenger se fait dans l'application, sur `messenger.com`. Le mot d
 
 ```
 .
-├── main.go, e2ee.go, history.go, attachments.go   Client Messenger (Go)
+├── cmd/messenger-lite/main.go                     Client Messenger (Go) : point d'entrée
+├── internal/                                      protocol (contrat JSON avec le hub), attachments, e2ee, history
 ├── hub/
 │   ├── hub.py                    Lanceur du hub (quelques lignes)
 │   ├── relais/                   Code du hub, en couches
