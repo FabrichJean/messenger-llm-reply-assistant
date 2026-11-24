@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#08080a">
+<title>Relais · Connexion</title>
+<meta name="robots" content="noindex">
+<script>try{var m=localStorage.getItem("hub_theme")||localStorage.getItem("hub_landing_theme")||"dark";var t=m==="auto"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.dataset.theme=t;document.documentElement.dataset.accent=localStorage.getItem("hub_accent")||"orange"}catch(e){document.documentElement.dataset.theme="dark";document.documentElement.dataset.accent="orange"}</script>
+<style>
+:root{--accent:#f26a1b;--accent-hover:#ff7f35;--accent-2:#c2410c;--bad:#ff6b6b}
+html[data-accent=ambre]{--accent:#f5a524;--accent-hover:#ffb83d;--accent-2:#d97706}
+html[data-accent=rose]{--accent:#ec4899;--accent-hover:#f472b6;--accent-2:#be185d}
+html[data-accent=violet]{--accent:#8b5cf6;--accent-hover:#a78bfa;--accent-2:#6d28d9}
+html[data-accent=bleu]{--accent:#3b82f6;--accent-hover:#60a5fa;--accent-2:#1d4ed8}
+html[data-accent=turquoise]{--accent:#14b8a6;--accent-hover:#2dd4bf;--accent-2:#0f766e}
+html[data-accent=vert]{--accent:#22c55e;--accent-hover:#4ade80;--accent-2:#15803d}
+html[data-accent=rouge]{--accent:#ef4444;--accent-hover:#f87171;--accent-2:#b91c1c}
+html[data-theme=dark]{--bg:#08080a;--text:#f5f5f6;--muted:#9a9aa3;--line:#ffffff1f;--card:#ffffff0c;--field:#ffffff10;--shadow:0 30px 80px -30px #000}
+html[data-theme=light]{--bg:#f3f0ed;--text:#1b1613;--muted:#6f655e;--line:#1a141026;--card:#ffffffcc;--field:#fff;--shadow:0 30px 70px -34px #50281466;--bad:#c62828}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;color:var(--text);font:15px/1.5 "Inter","SF Pro Display",system-ui,-apple-system,"Segoe UI",sans-serif;
+  background:radial-gradient(900px 520px at 85% -12%,color-mix(in srgb,var(--accent) 24%,transparent),transparent 62%),radial-gradient(700px 480px at 0% 110%,color-mix(in srgb,var(--accent) 14%,transparent),transparent 60%),var(--bg)}
+main{width:min(400px,calc(100vw - 32px));padding:32px;border-radius:28px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+.logo{display:flex;align-items:center;gap:10px;font-size:22px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px}
+.logo svg{color:var(--accent)}
+p{color:var(--muted);margin:0 0 20px;font-size:14px}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:500}
+input{width:100%;padding:13px 16px;border-radius:14px;border:1px solid var(--line);background:var(--field);color:var(--text);font:inherit}
+input:focus-visible{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+button{width:100%;margin-top:16px;padding:14px;border:0;border-radius:999px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font:inherit;font-weight:600;cursor:pointer;box-shadow:0 12px 30px -14px var(--accent)}
+button:hover{background:linear-gradient(135deg,var(--accent-hover),var(--accent))}button:disabled{opacity:.6;cursor:wait}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+#err{min-height:20px;margin-top:12px;color:var(--bad);font-size:13px}
+a{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <div class="logo"><svg width="34" height="34" viewBox="0 0 44 44"><rect x="3.5" y="4" width="24" height="21" rx="8" fill="none" stroke="currentColor" stroke-width="4"/><rect x="16.5" y="19" width="24" height="21" rx="8" fill="none" stroke="currentColor" stroke-width="4" opacity=".75"/></svg>Relais</div>
+  <p>Accès protégé. Connecte-toi avec ton identifiant.</p>
+  <form id="f"><label for="u">Identifiant</label><input id="u" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required style="margin-bottom:14px"><label for="p">Mot de passe</label><input id="p" type="password" autocomplete="current-password" required>
+  <button id="b" type="submit">Se connecter</button><div id="err" role="alert"></div></form>
+  <p style="margin:14px 0 0;text-align:center"><a href="/" style="color:var(--muted);font-size:13px;text-decoration:none">← Retour à l'accueil</a></p>
+</main>
+<script>
+document.getElementById('f').onsubmit=async e=>{
+  e.preventDefault();const b=document.getElementById('b'),er=document.getElementById('err');b.disabled=true;er.textContent='';
+  try{
+    const r=await fetch('/api/login',{method:'POST',headers:{'X-Hub':'1','Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('u').value,password:document.getElementById('p').value})});
+    const d=await r.json();
+    if(d.ok)location.href='/';else{er.textContent=d.error||'Identifiant ou mot de passe incorrect.';b.disabled=false}
+  }catch(x){er.textContent='Connexion impossible.';b.disabled=false}
+};
+</script>
+</body></html>
