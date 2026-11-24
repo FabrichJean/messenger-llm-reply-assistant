@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────────────────────
+#  Relais / messenger-lite — .gitignore
+#  Règle d'or : rien de ce qui contient une session Messenger,
+#  une clé, un mot de passe ou une conversation n'entre dans git.
+# ─────────────────────────────────────────────────────────────
+
+# ── Secrets et sessions Messenger (NE JAMAIS COMMITER) ──
+cookies.json
+history_device.json*
+e2ee.db*
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+/accounts/
+.backup-avant-migration/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ── Variables d'environnement et mots de passe ──
+.env
+.env.*
+!.env.example
+!*.env.example
+deploy/.env
+initial-passwords.txt
+**/initial-passwords.txt
+
+# ── Données d'exécution du hub (utilisateurs, sessions, conversations) ──
+hub/.lpkey
+hub/accounts.json
+hub/users.json
+hub/sessions.json
+hub/invites.json
+hub/agent.json
+hub/hub.db*
+hub/avatars/
+hub/linkcache/
+hub/sandbox/
+hub/*.out
+hub/*.err
+hub/*.tmp
+
+# ── Signature Android (le coffre est hors du dépôt : ~/.relais-signing) ──
+*.jks
+*.keystore
+keystore.properties
+signing.properties
