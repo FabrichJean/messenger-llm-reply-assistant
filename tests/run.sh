@@ -12,5 +12,6 @@ if [[ "$what" == all || "$what" == go ]]; then
 fi
 if [[ "$what" == all || "$what" == hub ]]; then
   echo "== Hub : tests de bout en bout (démarrent un vrai hub jetable)"
-  (cd tests && python3 -W ignore -m unittest discover -s . -p "test_*.py")
+  PY=python3; [ -x .venv/bin/python ] && PY="$PWD/.venv/bin/python"      # le .venv a Playwright : le test XSS (vrai navigateur) s'exécute
+  (cd tests && "$PY" -W ignore -m unittest discover -s . -p "test_*.py")
 fi

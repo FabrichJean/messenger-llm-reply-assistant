@@ -242,7 +242,13 @@ class Auth:
         now = time.time()
         with self._lock:
             fl = [t for t in self._fails.get(ip, []) if now - t < 300]
-            self._fails[ip] = fl
+            if fl:
+                self._fails[ip] = fl
+            else:
+                self._fails.pop(ip, None)      # pas d'entrée résiduelle : une rotation d'adresses ne doit pas faire grossir la mémoire sans limite
+            if len(self._fails) > 5000:       # garde-fou absolu : on oublie les plus anciennes adresses
+                for k in sorted(self._fails, key=lambda a: self._fails[a][-1])[:len(self._fails) - 5000]:
+                    del self._fails[k]
             self._all_fails = [t for t in self._all_fails if now - t < 600]
             return len(fl) >= 5 or len(self._all_fails) >= 30
 

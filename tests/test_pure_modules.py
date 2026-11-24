@@ -128,6 +128,19 @@ class AuthModule(unittest.TestCase):
             for _ in range(30):
                 self.a.login("bob", "faux", "9.9.9.9")
 
+    def test_les_compteurs_d_echecs_ne_grossissent_pas_sans_limite(self):
+        """Une rotation d'adresses (IPv6) ne doit pas faire grossir la mémoire : les entrées expirées disparaissent, le total est plafonné."""
+        now = time.time()
+        for i in range(300):
+            self.a._fails[f"2001:db8::{i:x}"] = [now - 400]                       # échecs vieux de 400 s : hors de la fenêtre de 300 s
+        for i in range(300):
+            self.a.locked(f"2001:db8::{i:x}")
+        self.assertEqual(len(self.a._fails), 0, "des entrées expirées sont restées en mémoire")
+        for i in range(6000):
+            self.a._fails[f"2001:db9::{i:x}"] = [now - 10]                        # 6000 adresses actives
+        self.a.locked("2001:db9::1")
+        self.assertLessEqual(len(self.a._fails), 5000, "le nombre d'adresses suivies n'est pas plafonné")
+
     def test_suppression_ferme_les_sessions(self):
         self.a.create_user("bob", "Bob--motdepasse-2")
         tok = self.a.login("bob", "Bob--motdepasse-2", "1.1.1.1")

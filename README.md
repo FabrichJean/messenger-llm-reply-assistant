@@ -138,7 +138,7 @@ La connexion Messenger se fait dans l'application, sur `messenger.com`. Le mot d
 - Mots de passe Messenger jamais conservés ; l'appel au LLM se fait avec un environnement minimal et sans outils.
 
 > [!NOTE]
-> Un audit de sécurité indépendant n'a pas encore été réalisé. Si tu découvres une faille, ouvre une *issue* sans y publier de détails exploitables.
+> Les protections sont décrites dans [`docs/security.md`](docs/security.md) et couvertes par des tests d'attaque automatisés (`tests/test_security_*.py`). Aucun audit **externe** n'a été réalisé. Si tu découvres une faille, ouvre une *issue* sans y publier de détails exploitables.
 
 ## Structure du dépôt
 

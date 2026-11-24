@@ -24,6 +24,7 @@ Aucun test n'importe `hub.py` : ils ne dépendent donc pas de l'organisation int
 | `test_hub_replies.py` | réponse automatique de bout en bout, prompts, mémoire ciblée, brouillons, sujets sensibles, urgences, messages piégés, anti-tic, reprise en main, limites |
 | `test_hub_api.py` | routes utilisées par l'interface (réglages, mémoire, envoi, épinglage, suppression, extension) |
 | `test_ui_pages.py` | assemblage de l'interface (`hub/ui/`), page servie, rechargement à chaud, JavaScript valide (`node --check`) |
+| `test_security_*.py` (9 fichiers) | audit de sécurité : autorisations, authentification, HTTP hostile, XSS, SSRF, secrets, injection de prompt, contrôle des réponses, scripts (voir [`docs/security.md`](../docs/security.md)) |
 | `test_pure_modules.py` | `humanize`, `memory`, `security`, `auth` (importés directement, à plat ou dans `relais/`) |
 
 Les données de test sont fictives. Rien n'est écrit en dehors du dossier temporaire.

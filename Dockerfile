@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # --- 1) client Messenger (Go + SQLite via cgo) -------------------------------------------------------------
-ARG GO_VERSION=1.26
+# Version du compilateur Go figée : go1.26.11 corrige 15 failles de la bibliothèque standard présentes dans go1.26.5 (govulncheck)
+ARG GO_VERSION=1.26.11
 FROM golang:${GO_VERSION}-bookworm AS build
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -11,9 +12,11 @@ RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/messenger-lite ./c
 
 # --- 2) image d'exécution : hub Python + Claude CLI + client ----------------------------------------------
 FROM python:3.12-slim-bookworm
+# Claude CLI : version figée (une reconstruction n'installe pas silencieusement une version plus récente ; à relever volontairement)
+ARG CLAUDE_CODE_VERSION=2.1.331
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl tini nodejs npm \
- && npm install -g @anthropic-ai/claude-code \
+ && npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
  && npm cache clean --force \
  && rm -rf /var/lib/apt/lists/*
 
