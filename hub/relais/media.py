@@ -162,16 +162,31 @@ def urls_in(text, limit=2):
     return out
 
 
+def _is_public(ip):
+    """Vrai seulement pour une adresse routable sur Internet (liste d'autorisation, pas d'interdits à énumérer).
+    Exclut notamment 100.64.0.0/10 (réseau partagé : Tailscale, métadonnées de certains clouds), qu'une liste d'interdits oublie."""
+    if ip.version == 6:
+        for inner in (ip.ipv4_mapped, ip.sixtofour):                      # IPv4 embarquée : on juge l'adresse IPv4 qu'elle contient
+            if inner is not None:
+                return _is_public(inner)
+        if ip.teredo is not None:
+            return all(_is_public(x) for x in ip.teredo)
+        if ip in _NAT64:
+            return _is_public(ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF))
+    return ip.is_global and not ip.is_multicast
+
+
+_NAT64 = ipaddress.ip_network("64:ff9b::/96")
+
+
 def _public_ips(host, port):
     """Adresses du nom d'hôte, toutes devant être publiques (jamais le réseau local, l'hôte lui-même ou un service interne)."""
     infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     ips = []
     for fam, _t, _p, _c, sa in infos:
         ip = ipaddress.ip_address(sa[0])
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified or (
-                getattr(ip, "ipv4_mapped", None) and (ip.ipv4_mapped.is_private or ip.ipv4_mapped.is_loopback)):
-            if not ALLOW_LOCAL:
-                raise ValueError("adresse non publique refusée")
+        if not _is_public(ip) and not ALLOW_LOCAL:
+            raise ValueError("adresse non publique refusée")
         ips.append(sa[0])
     if not ips:
         raise ValueError("hôte introuvable")
