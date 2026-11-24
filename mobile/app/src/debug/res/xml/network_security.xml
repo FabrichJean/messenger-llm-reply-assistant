@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- version de TEST uniquement : autorise le clair vers l'hôte de l'émulateur (10.0.2.2 = le Mac) -->
+<network-security-config>
